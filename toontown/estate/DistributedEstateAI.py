@@ -36,6 +36,7 @@ class DistributedEstateAI(DistributedObjectAI):
         self.treasureIds = []
         self.accountId = 0
         self.rentalObjects = []
+        self.gardens = {}   # slot -> GardenAI
 
     # ---- required fields ----------------------------------------------------
     def setEstateType(self, estateType):
@@ -128,9 +129,58 @@ class DistributedEstateAI(DistributedObjectAI):
     def setClosestHouse(self, index):
         pass
 
+    # ---- gardens --------------------------------------------------------------
+    def d_setIdList(self, idList):
+        self.idList = list(idList)
+        self.sendUpdate('setIdList', [self.idList])
+
+    def createGarden(self, slot, ownerId):
+        from toontown.estate.GardenAI import GardenAI
+        if slot in self.gardens:
+            return self.gardens[slot]
+        garden = GardenAI(self.air, self, slot, ownerId)
+        garden.create()
+        self.gardens[slot] = garden
+        return garden
+
+    def placeStarterGarden(self, avId):
+        """Called when a Garden Starter Kit is accepted from the mailbox."""
+        av = self.air.doId2do.get(avId)
+        if av is not None:
+            av.b_setGardenStarted(1)
+        if avId in self.idList:
+            self.createGarden(self.idList.index(avId), avId)
+
+    def cleanupGardens(self):
+        for garden in self.gardens.values():
+            try:
+                garden.cleanup()
+            except Exception as e:
+                self.notify.warning('Could not clean up garden: %s' % e)
+        self.gardens = {}
+
     def completeFlowerSale(self, flag):
-        # Flower selling comes with gardening (stage 4).
-        pass
+        """Selling the flower basket at the estate wheelbarrow."""
+        if not flag:
+            return
+        from toontown.estate import GardenGlobals
+        avId = self.air.getAvatarIdFromSender()
+        av = self.air.doId2do.get(avId)
+        if av is None or not len(av.flowerBasket):
+            return
+        value = av.flowerBasket.getTotalValue()
+        for flower in av.flowerBasket.getFlower():
+            av.flowerCollection.collectFlower(flower)
+        av.b_setFlowerCollection(*av.flowerCollection.getNetLists())
+        av.b_setFlowerBasket([], [])
+        av.addMoney(value)
+        trophies = len(av.flowerCollection) // GardenGlobals.FLOWERS_PER_BONUS
+        oldTrophies = len(av.getGardenTrophies())
+        if trophies > oldTrophies:
+            av.b_setGardenTrophies(list(range(trophies)))
+            av.b_setMaxHp(av.getMaxHp() + (trophies - oldTrophies))
+            av.toonUp(av.getMaxHp())
+            self.sendUpdate('awardedTrophy', [avId])
 
     # ---- rentals (cannons and the game table) ---------------------------------
     def __rentalPath(self):

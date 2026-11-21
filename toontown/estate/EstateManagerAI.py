@@ -168,6 +168,20 @@ class EstateManagerAI(DistributedObjectAI):
             estate.loadRental(instance.accountId)
         except Exception as e:
             self.notify.warning('Could not restore rental: %s' % e)
+
+        # Gardens: the client works out who owns each garden from this list.
+        estate.d_setIdList(avList)
+        from toontown.estate.GardenAI import gardenExists
+        for slot, avId in enumerate(avList):
+            if not avId:
+                continue
+            toon = self.air.doId2do.get(avId)
+            started = toon is not None and toon.getGardenStarted()
+            if started or gardenExists(self.air, avId):
+                try:
+                    estate.createGarden(slot, avId)
+                except Exception as e:
+                    self.notify.warning('Could not set up garden %s: %s' % (slot, e))
         self.notify.info('Loaded estate for account %s in zone %s' % (instance.accountId, instance.zoneId))
 
         waiting, instance.waiting = instance.waiting, []
@@ -240,6 +254,7 @@ class EstateManagerAI(DistributedObjectAI):
                 instance.estate.cleanupRentals()
             except Exception as e:
                 self.notify.warning('Could not clean up rentals: %s' % e)
+            instance.estate.cleanupGardens()
             for avId in list(self.estate):
                 if self.estate[avId] is instance.estate:
                     del self.estate[avId]
