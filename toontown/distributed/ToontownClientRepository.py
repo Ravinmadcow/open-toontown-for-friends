@@ -835,11 +835,15 @@ class ToontownClientRepository(OTPClientRepository.OTPClientRepository):
         return 1
 
     def removeFriend(self, avatarId):
-        base.localAvatar.sendUpdate('friendsNotify', [base.localAvatar.doId, 1], sendToId=avatarId)
-        datagram = PyDatagram()
-        datagram.addUint16(CLIENT_REMOVE_FRIEND)
-        datagram.addUint32(avatarId)
-        self.send(datagram)
+        if __astron__:
+            if self.friendManager:
+                self.friendManager.d_requestRemoveFriend(avatarId)
+        else:
+            base.localAvatar.sendUpdate('friendsNotify', [base.localAvatar.doId, 1], sendToId=avatarId)
+            datagram = PyDatagram()
+            datagram.addUint16(CLIENT_REMOVE_FRIEND)
+            datagram.addUint32(avatarId)
+            self.send(datagram)
         self.estateMgr.removeFriend(base.localAvatar.doId, avatarId)
         for pair in base.localAvatar.friendsList:
             friendId = pair[0]
@@ -855,7 +859,10 @@ class ToontownClientRepository(OTPClientRepository.OTPClientRepository):
 
     def sendGetFriendsListRequest(self):
         if __astron__:
-            print('sendGetFriendsListRequest TODO')
+            self.friendsMapPending = 1
+            self.friendsListError = 0
+            if self.friendManager:
+                self.friendManager.d_requestFriendsList()
         else:
             self.friendsMapPending = 1
             self.friendsListError = 0
@@ -893,6 +900,42 @@ class ToontownClientRepository(OTPClientRepository.OTPClientRepository):
                 petAvatar.detectLeaks()
 
         PetDetail.PetDetail(doId, petDetailsCallback)
+
+    def __makeFriendHandle(self, entry):
+        doId, name, dnaString, petId, online = entry
+        dna = ToonDNA.ToonDNA()
+        dna.makeFromNetString(dnaString)
+        return FriendHandle.FriendHandle(doId, name, dna, petId)
+
+    def handleAstronFriendsList(self, entries):
+        for entry in entries:
+            handle = self.__makeFriendHandle(entry)
+            doId = entry[0]
+            self.friendsMap[doId] = handle
+            if entry[4]:
+                if doId not in self.friendsOnline:
+                    self.friendsOnline[doId] = handle
+                    messenger.send('friendOnline', [doId, 1, 1])
+                else:
+                    self.friendsOnline[doId] = handle
+        self.friendsMapPending = 0
+        messenger.send('friendsMapComplete')
+        messenger.send('friendsListChanged')
+
+    def handleAstronFriendOnline(self, doId):
+        if doId not in self.friendsOnline:
+            self.friendsOnline[doId] = self.identifyFriend(doId)
+            messenger.send('friendOnline', [doId, 1, 1])
+
+    def handleAstronFriendOffline(self, doId):
+        if doId in self.friendsOnline:
+            del self.friendsOnline[doId]
+            messenger.send('friendOffline', [doId])
+
+    def handleAstronAvatarInfo(self, entries):
+        handles = [self.__makeFriendHandle(entry) for entry in entries if entry[1]]
+        if handles:
+            messenger.send('gotExtraFriendHandles', [handles])
 
     def handleGetFriendsList(self, di):
         error = di.getUint8()
@@ -1201,6 +1244,10 @@ class ToontownClientRepository(OTPClientRepository.OTPClientRepository):
     def requestAvatarInfo(self, avId):
         if avId == 0:
             return
+        if __astron__:
+            if self.friendManager:
+                self.friendManager.d_requestAvatarInfo([avId])
+            return
         datagram = PyDatagram()
         datagram.addUint16(CLIENT_GET_FRIEND_LIST_EXTENDED)
         datagram.addUint16(1)
@@ -1222,6 +1269,11 @@ class ToontownClientRepository(OTPClientRepository.OTPClientRepository):
         if not hasattr(self, 'avatarInfoRequests'):
             return
         if len(self.avatarInfoRequests) == 0:
+            return
+        if __astron__:
+            if self.friendManager:
+                self.friendManager.d_requestAvatarInfo(self.avatarInfoRequests)
+            self.avatarInfoRequests = []
             return
         datagram = PyDatagram()
         datagram.addUint16(CLIENT_GET_FRIEND_LIST_EXTENDED)

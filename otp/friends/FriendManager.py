@@ -109,3 +109,25 @@ class FriendManager(DistributedObject.DistributedObject):
 
     def submitSecretResponse(self, result, avId):
         messenger.send('submitSecretResponse', [result, avId])
+
+    # ---- friends list, online status (Open Toontown server) --------------
+    def d_requestFriendsList(self):
+        self.sendUpdate('requestFriendsList', [])
+
+    def friendsListResponse(self, entries):
+        base.cr.handleAstronFriendsList(entries)
+
+    def friendOnline(self, doId):
+        base.cr.handleAstronFriendOnline(doId)
+
+    def friendOffline(self, doId):
+        base.cr.handleAstronFriendOffline(doId)
+
+    def d_requestAvatarInfo(self, avIds):
+        self.sendUpdate('requestAvatarInfo', [list(avIds)])
+
+    def avatarInfoResponse(self, entries):
+        base.cr.handleAstronAvatarInfo(entries)
+
+    def d_requestRemoveFriend(self, avId):
+        self.sendUpdate('requestRemoveFriend', [avId])

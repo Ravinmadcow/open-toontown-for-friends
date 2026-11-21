@@ -1,5 +1,7 @@
 from direct.directnotify import DirectNotifyGlobal
 from direct.distributed.DistributedObjectGlobalAI import DistributedObjectGlobalAI
+from direct.distributed.MsgTypes import CLIENTAGENT_DECLARE_OBJECT, CLIENTAGENT_UNDECLARE_OBJECT
+from direct.distributed.PyDatagram import PyDatagram
 from otp.otpbase import OTPGlobals
 
 # friendConsidering codes the client understands (see FriendInviter.__friendConsidering)
@@ -39,6 +41,7 @@ class FriendManagerAI(DistributedObjectGlobalAI):
         DistributedObjectGlobalAI.__init__(self, air)
         self.nextContext = 1
         self.requests = {}  # context -> [inviterId, inviteeId]
+        self.online = set()  # toons that have logged in and asked for their friends list
 
     # ---- helpers ------------------------------------------------------------
     def __getToon(self, avId):
@@ -149,6 +152,10 @@ class FriendManagerAI(DistributedObjectGlobalAI):
                     self.notify.warning('Friend quest update failed: %s' % e)
         self.air.writeServerEvent('friends-made', av1.getDoId(), av2.getDoId())
         self.notify.info('%s and %s are now friends' % (av1.getDoId(), av2.getDoId()))
+        # Let both toons see each other in their friends lists straight away.
+        for av in (av1, av2):
+            if av.getDoId() in self.online:
+                self.__sendFriendsList(av.getDoId())
 
     # ---- secret friends (not supported yet) --------------------------------
     def requestSecret(self):
@@ -158,3 +165,118 @@ class FriendManagerAI(DistributedObjectGlobalAI):
     def submitSecret(self, secret):
         avId = self.air.getAvatarIdFromSender()
         self.sendUpdateToAvatarId(avId, 'submitSecretResponse', [0, 0])
+
+    # ==== friends list, online status, whispers and teleporting ================
+    # The client can only send messages to toons it knows about, so we
+    # 'declare' each online friend's toon to it. That is what makes whispers
+    # and teleport requests to friends in other places work.
+
+    def __declare(self, toClientAvId, objectId, declare=True):
+        obj = self.air.doId2do.get(objectId)
+        if obj is None or not hasattr(obj, 'dclass'):
+            return
+        dg = PyDatagram()
+        msgType = CLIENTAGENT_DECLARE_OBJECT if declare else CLIENTAGENT_UNDECLARE_OBJECT
+        dg.addServerHeader(self.GetPuppetConnectionChannel(toClientAvId), self.air.ourChannel, msgType)
+        dg.addUint32(objectId)
+        if declare:
+            dg.addUint16(obj.dclass.getNumber())
+        self.air.send(dg)
+
+    def __isOnline(self, avId):
+        return avId in self.online and avId in self.air.doId2do
+
+    def __getInfo(self, avIds, callback):
+        """Looks up name and look for each toon; calls back with a list of entries."""
+        entries = {}
+        pending = set()
+        for avId in avIds:
+            av = self.air.doId2do.get(avId)
+            if av is not None and hasattr(av, 'getDNAString'):
+                entries[avId] = [avId, av.getName(), av.getDNAString(), getattr(av, 'petId', 0) or 0,
+                                 1 if self.__isOnline(avId) else 0]
+            else:
+                pending.add(avId)
+
+        def finish():
+            callback([entries[avId] for avId in avIds if avId in entries])
+
+        if not pending:
+            finish()
+            return
+        for avId in list(pending):
+            def gotToon(dclass, fields, avId=avId):
+                try:
+                    entries[avId] = [avId, fields['setName'][0], fields['setDNAString'][0],
+                                     (fields.get('setPetId') or [0])[0], 0]
+                except Exception:
+                    pass  # not a toon any more (deleted)
+                pending.discard(avId)
+                if not pending:
+                    finish()
+            self.air.dbInterface.queryObject(self.air.dbId, avId, gotToon)
+
+    def __sendFriendsList(self, avId):
+        av = self.air.doId2do.get(avId)
+        if av is None:
+            return
+        friendIds = [entry[0] for entry in av.getFriendsList()]
+        for friendId in friendIds:
+            if self.__isOnline(friendId):
+                self.__declare(avId, friendId)
+                self.__declare(friendId, avId)
+        self.__getInfo(friendIds, lambda entries: self.sendUpdateToAvatarId(avId, 'friendsListResponse', [entries]))
+
+    def requestFriendsList(self):
+        avId = self.air.getAvatarIdFromSender()
+        av = self.air.doId2do.get(avId)
+        if av is None:
+            return
+        firstTime = avId not in self.online
+        self.online.add(avId)
+        self.__sendFriendsList(avId)
+        if firstTime:
+            self.acceptOnce(self.air.getAvatarExitEvent(avId), self.__avatarOffline, [avId])
+            for entry in av.getFriendsList():
+                friendId = entry[0]
+                if self.__isOnline(friendId):
+                    self.sendUpdateToAvatarId(friendId, 'friendOnline', [avId])
+
+    def __avatarOffline(self, avId):
+        self.online.discard(avId)
+        for friendId in list(self.online):
+            friend = self.air.doId2do.get(friendId)
+            if friend is None:
+                continue
+            if any(entry[0] == avId for entry in friend.getFriendsList()):
+                self.sendUpdateToAvatarId(friendId, 'friendOffline', [avId])
+
+    def requestAvatarInfo(self, avIds):
+        avId = self.air.getAvatarIdFromSender()
+        avIds = list(avIds)[:50]
+        self.__getInfo(avIds, lambda entries: self.sendUpdateToAvatarId(avId, 'avatarInfoResponse', [entries]))
+
+    def requestRemoveFriend(self, friendId):
+        avId = self.air.getAvatarIdFromSender()
+        for a, b in ((avId, friendId), (friendId, avId)):
+            av = self.air.doId2do.get(a)
+            if av is not None:
+                newList = [entry for entry in av.getFriendsList() if entry[0] != b]
+                av.setFriendsList(newList)
+                av.d_setFriendsList(newList)
+            else:
+                self.__removeOffline(a, b)
+        if self.__isOnline(friendId):
+            self.sendUpdateToAvatarId(friendId, 'friendOffline', [avId])
+            self.__sendFriendsList(friendId)
+        self.__sendFriendsList(avId)
+
+    def __removeOffline(self, avId, friendId):
+        """The other toon is offline: update their saved friends list in the database."""
+        def gotToon(dclass, fields):
+            try:
+                friends = [entry for entry in fields['setFriendsList'][0] if entry[0] != friendId]
+            except Exception:
+                return
+            self.air.dbInterface.updateObject(self.air.dbId, avId, dclass, {'setFriendsList': (friends,)})
+        self.air.dbInterface.queryObject(self.air.dbId, avId, gotToon)
