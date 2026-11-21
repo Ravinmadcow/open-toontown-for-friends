@@ -26,12 +26,14 @@ def makeDefaultWallpaper():
 class DistributedHouseInteriorAI(DistributedObjectAI):
     notify = DirectNotifyGlobal.directNotify.newCategory('DistributedHouseInteriorAI')
 
-    def __init__(self, air, house):
+    def __init__(self, air, house, wallpaper=None, windows=None):
         DistributedObjectAI.__init__(self, air)
         self.houseId = house.getDoId()
         self.houseIndex = house.getHousePos()
-        self.wallpaper = makeDefaultWallpaper()
-        self.windows = CatalogItemList()
+        if wallpaper is None or len(wallpaper) < 8:
+            wallpaper = makeDefaultWallpaper()
+        self.wallpaper = wallpaper
+        self.windows = windows if windows is not None else CatalogItemList()
 
     def getHouseId(self):
         return self.houseId
@@ -44,3 +46,9 @@ class DistributedHouseInteriorAI(DistributedObjectAI):
 
     def getWindows(self):
         return self.windows.getBlob(store=CatalogItem.Customization | CatalogItem.WindowPlacement)
+
+    def d_setWallpaper(self):
+        self.sendUpdate('setWallpaper', [self.getWallpaper()])
+
+    def d_setWindows(self):
+        self.sendUpdate('setWindows', [self.getWindows()])

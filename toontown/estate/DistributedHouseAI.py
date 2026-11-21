@@ -126,15 +126,19 @@ class DistributedHouseAI(DistributedObjectAI):
         from toontown.estate.DistributedHouseInteriorAI import DistributedHouseInteriorAI
         from toontown.estate.DistributedFurnitureManagerAI import DistributedFurnitureManagerAI
         from toontown.estate.DistributedHouseDoorAI import DistributedHouseDoorAI
+        from toontown.estate import HouseStorageAI
+
+        # Load this toon's saved house, if they have one.
+        saved = HouseStorageAI.load(self.air, self.avatarId) or {}
 
         self.interiorZone = self.air.allocateZone()
 
-        self.interior = DistributedHouseInteriorAI(self.air, self)
+        self.interior = DistributedHouseInteriorAI(self.air, self, saved.get('wallpaper'), saved.get('windows'))
         self.interior.generateWithRequired(self.interiorZone)
 
-        self.furnitureMgr = DistributedFurnitureManagerAI(self.air, self, self.interior)
+        self.furnitureMgr = DistributedFurnitureManagerAI(self.air, self, self.interior, saved)
         self.furnitureMgr.generateWithRequired(self.interiorZone)
-        self.furnitureMgr.createDefaultFurniture()
+        self.furnitureMgr.createFurniture()
 
         door = DistributedHouseDoorAI(self.air, self.getDoId(), DoorTypes.EXT_STANDARD)
         insideDoor = DistributedHouseDoorAI(self.air, self.getDoId(), DoorTypes.INT_STANDARD)
@@ -148,11 +152,12 @@ class DistributedHouseAI(DistributedObjectAI):
         self.insideDoor = insideDoor
 
     def cleanupInterior(self):
+        # The furniture manager saves the house as it cleans up.
+        if self.furnitureMgr is not None:
+            self.furnitureMgr.cleanup()
         for obj in (self.door, self.insideDoor, self.interior):
             if obj is not None:
                 obj.requestDelete()
-        if self.furnitureMgr is not None:
-            self.furnitureMgr.cleanup()
         self.door = self.insideDoor = self.interior = self.furnitureMgr = None
         if self.interiorZone is not None:
             self.air.deallocateZone(self.interiorZone)
