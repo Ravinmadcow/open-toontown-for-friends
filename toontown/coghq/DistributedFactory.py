@@ -1,3 +1,4 @@
+from panda3d.otp import CFThought, CFTimeout
 from panda3d.core import *
 from toontown.toonbase.ToontownGlobals import *
 from direct.distributed.ClockDelta import *

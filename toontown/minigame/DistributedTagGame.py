@@ -1,3 +1,4 @@
+from panda3d.otp import NametagGlobals
 from panda3d.core import *
 from toontown.toonbase.ToonBaseGlobal import *
 from .DistributedMinigame import *

@@ -1,3 +1,4 @@
+from panda3d.otp import CFSpeech, CFThought, CFTimeout
 import string
 from direct.showbase import DirectObject
 from direct.fsm import ClassicFSM

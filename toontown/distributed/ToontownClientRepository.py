@@ -1,3 +1,4 @@
+from panda3d.otp import NametagGlobals
 from panda3d.core import *
 from direct.distributed.ClockDelta import *
 from direct.gui.DirectGui import *

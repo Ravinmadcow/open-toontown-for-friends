@@ -1,3 +1,4 @@
+from panda3d.toontown import DNASuitPoint
 from panda3d.core import *
 from direct.distributed import DistributedObject
 from . import SuitPlannerBase

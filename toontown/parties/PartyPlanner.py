@@ -1,3 +1,4 @@
+from panda3d.otp import CFSpeech, Nametag, NametagFloat2d, NametagGroup
 import calendar
 from datetime import datetime
 from datetime import timedelta

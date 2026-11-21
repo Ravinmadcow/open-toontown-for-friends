@@ -1,3 +1,4 @@
+from panda3d.otp import CFThought, CFTimeout
 import random
 import math
 import time

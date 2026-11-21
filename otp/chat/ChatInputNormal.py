@@ -1,3 +1,4 @@
+from panda3d.otp import CFSpeech, CFTimeout
 from direct.showbase import DirectObject
 from otp.otpbase import OTPGlobals
 import sys

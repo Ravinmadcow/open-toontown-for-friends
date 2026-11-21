@@ -1,3 +1,4 @@
+from panda3d.otp import NametagFloat3d
 from direct.directnotify import DirectNotifyGlobal
 from panda3d.otp import Nametag
 from panda3d.core import *

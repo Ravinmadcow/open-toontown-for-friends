@@ -1,3 +1,4 @@
+from panda3d.otp import NametagGlobals
 from direct.gui.DirectGui import *
 from panda3d.core import *
 from panda3d.direct import SmoothMover

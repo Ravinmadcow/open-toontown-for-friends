@@ -1,3 +1,4 @@
+from panda3d.otp import CFSpeech, CFTimeout
 from panda3d.core import *
 from direct.showbase.DirectObject import *
 from direct.distributed.ClockDelta import *

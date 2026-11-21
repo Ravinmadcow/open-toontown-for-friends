@@ -1,3 +1,4 @@
+from panda3d.otp import CFSpeech, CFTimeout
 from direct.interval.IntervalGlobal import *
 from .BattleProps import *
 from .BattleSounds import *

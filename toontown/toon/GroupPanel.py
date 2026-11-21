@@ -1,3 +1,4 @@
+from panda3d.otp import NametagGlobals, NametagGroup
 from direct.directnotify import DirectNotifyGlobal
 from toontown.toonbase import ToontownGlobals
 from toontown.toonbase import TTLocalizer
