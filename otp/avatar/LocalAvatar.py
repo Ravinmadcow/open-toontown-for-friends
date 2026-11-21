@@ -1141,7 +1141,10 @@ class LocalAvatar(DistributedAvatar.DistributedAvatar, DistributedSmoothNode.Dis
 
     def d_broadcastPositionNow(self):
         self.d_clearSmoothing()
-        self.d_broadcastPosHpr()
+        # The broadcast can already have been stopped (for example if the
+        # teleport-in animation finished instantly), so check first.
+        if self.d_broadcastPosHpr is not None:
+            self.d_broadcastPosHpr()
 
     def travCollisionsLOS(self, n = None):
         if n == None:

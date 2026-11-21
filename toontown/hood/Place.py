@@ -758,9 +758,11 @@ class Place(StateData, FriendsListManager):
         base.localAvatar.startUpdateSmartCamera()
         base.localAvatar.startPosHprBroadcast()
         base.clock.tick()
-        base.localAvatar.b_setAnimState('TeleportIn', 1, callback=self.teleportInDone)
+        # Send our position before starting the animation: if the animation
+        # finishes at once, it stops position broadcasting straight away.
         base.localAvatar.d_broadcastPositionNow()
         base.localAvatar.b_setParent(ToontownGlobals.SPRender)
+        base.localAvatar.b_setAnimState('TeleportIn', 1, callback=self.teleportInDone)
 
     def teleportInDone(self):
         if hasattr(self, 'fsm'):

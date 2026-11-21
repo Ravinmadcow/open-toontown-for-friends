@@ -173,16 +173,28 @@ class DistributedFurnitureManagerAI(DistributedObjectAI):
     def __setDirector(self, avId):
         if self.director:
             self.ignore(self.air.getAvatarExitEvent(self.director))
+            if not avId:
+                old = self.air.doId2do.get(self.director)
+                if old is not None and hasattr(old, 'b_setGhostMode'):
+                    old.b_setGhostMode(0)
         self.director = avId
         if avId:
             self.acceptOnce(self.air.getAvatarExitEvent(avId), self.__setDirector, [0])
         self.sendUpdate('setDirector', [avId])
 
     def avatarEnter(self):
-        pass
+        # The arranging toon turns see-through while in furniture mode.
+        avId = self.air.getAvatarIdFromSender()
+        av = self.air.doId2do.get(avId)
+        if av is not None and hasattr(av, 'b_setGhostMode'):
+            av.b_setGhostMode(1)
 
     def avatarExit(self):
+        # ...and back to normal afterwards (the client relies on us for this).
         avId = self.air.getAvatarIdFromSender()
+        av = self.air.doId2do.get(avId)
+        if av is not None and hasattr(av, 'b_setGhostMode'):
+            av.b_setGhostMode(0)
         if avId == self.director:
             self.__setDirector(0)
 
