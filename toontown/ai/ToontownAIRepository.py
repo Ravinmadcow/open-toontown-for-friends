@@ -17,6 +17,7 @@ from toontown.coghq.LawOfficeManagerAI import LawOfficeManagerAI
 from toontown.coghq.MintManagerAI import MintManagerAI
 from toontown.coghq.PromotionManagerAI import PromotionManagerAI
 from toontown.distributed.ToontownDistrictAI import ToontownDistrictAI
+from toontown.estate.EstateManagerAI import EstateManagerAI
 from toontown.distributed.ToontownDistrictStatsAI import ToontownDistrictStatsAI
 from toontown.distributed.ToontownInternalRepository import ToontownInternalRepository
 from toontown.hood import ZoneUtil
@@ -198,6 +199,10 @@ class ToontownAIRepository(ToontownInternalRepository):
 
         # Generate our friend manager (handles making friends)...
         self.friendManager = self.generateGlobalObject(OTP_DO_ID_FRIEND_MANAGER, 'FriendManager')
+
+        # Generate our estate manager (Go Home / estates)...
+        self.estateMgr = EstateManagerAI(self)
+        self.estateMgr.generateWithRequired(OTP_ZONE_ID_MANAGEMENT)
 
         # Generate our news manager...
         self.newsManager = NewsManagerAI(self)
