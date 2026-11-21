@@ -1,9 +1,16 @@
+import json
+import os
 import time
 
 from direct.directnotify import DirectNotifyGlobal
 from direct.distributed.DistributedObjectAI import DistributedObjectAI
 
 from toontown.estate import HouseGlobals
+from toontown.toonbase import ToontownGlobals
+
+# Where rented items go on the estate grounds.
+TARGET_POS = (30.0, -126.0, 0.0)               # floating over the pond
+GAME_TABLE_POSHPR = (-20.0, -100.0, 2.22, 0, 0, 0)
 
 
 class DistributedEstateAI(DistributedObjectAI):
@@ -27,6 +34,8 @@ class DistributedEstateAI(DistributedObjectAI):
         self.clouds = 0
         self.idList = []
         self.treasureIds = []
+        self.accountId = 0
+        self.rentalObjects = []
 
     # ---- required fields ----------------------------------------------------
     def setEstateType(self, estateType):
@@ -122,3 +131,96 @@ class DistributedEstateAI(DistributedObjectAI):
     def completeFlowerSale(self, flag):
         # Flower selling comes with gardening (stage 4).
         pass
+
+    # ---- rentals (cannons and the game table) ---------------------------------
+    def __rentalPath(self):
+        folder = os.path.join(getattr(self.air, 'dataFolder', '') or '', 'estates')
+        return folder, os.path.join(folder, '%d.json' % self.accountId)
+
+    def __saveRental(self):
+        if not self.accountId:
+            return
+        folder, path = self.__rentalPath()
+        try:
+            os.makedirs(folder, exist_ok=True)
+            with open(path, 'w') as f:
+                json.dump({'rentalType': self.rentalType, 'rentalEnd': self.rentalTimeStamp}, f)
+        except Exception as e:
+            self.notify.warning('Could not save rental: %s' % e)
+
+    def loadRental(self, accountId):
+        """Called once the estate is up: brings back a rental that has time left."""
+        self.accountId = accountId
+        folder, path = self.__rentalPath()
+        try:
+            with open(path, 'r') as f:
+                data = json.load(f)
+            self.rentalType = data.get('rentalType', 0)
+            self.rentalTimeStamp = data.get('rentalEnd', 0)
+        except Exception:
+            return
+        if self.rentalType and self.rentalTimeStamp > time.time():
+            self.__startRental()
+
+    def rentItem(self, typeIndex, duration):
+        """Called when a rental from the catalogue is accepted. duration is in minutes."""
+        now = time.time()
+        if self.rentalType == typeIndex and self.rentalTimeStamp > now:
+            self.rentalTimeStamp += duration * 60  # extend the current rental
+        else:
+            self.__stopRental(announce=False)
+            self.rentalType = typeIndex
+            self.rentalTimeStamp = now + duration * 60
+            self.__startRental()
+        self.__scheduleEnd()
+        self.__saveRental()
+
+    def __startRental(self):
+        if self.rentalType == ToontownGlobals.RentalCannon:
+            from toontown.estate.DistributedTargetAI import DistributedTargetAI
+            from toontown.estate.DistributedCannonAI import DistributedCannonAI
+            from toontown.estate import CannonGlobals
+            target = DistributedTargetAI(self.air, *TARGET_POS)
+            target.generateWithRequired(self.zoneId)
+            self.rentalObjects.append(target)
+            for drop in CannonGlobals.cannonDrops:
+                cannon = DistributedCannonAI(self.air, self.getDoId(), target.getDoId(), *drop)
+                cannon.generateWithRequired(self.zoneId)
+                self.rentalObjects.append(cannon)
+        elif self.rentalType == ToontownGlobals.RentalGameTable:
+            from toontown.safezone.DistributedPicnicTableAI import DistributedPicnicTableAI
+            # This table generates itself when it is created.
+            table = DistributedPicnicTableAI(self.air, self.zoneId, '1', *GAME_TABLE_POSHPR)
+            self.rentalObjects.append(table)
+        self.__scheduleEnd()
+
+    def __scheduleEnd(self):
+        taskMgr.remove(self.uniqueName('rentalEnd'))
+        remaining = self.rentalTimeStamp - time.time()
+        if self.rentalType and remaining > 0:
+            taskMgr.doMethodLater(remaining, self.__rentalOver, self.uniqueName('rentalEnd'))
+
+    def __rentalOver(self, task):
+        self.__stopRental(announce=True)
+        self.rentalType = 0
+        self.rentalTimeStamp = 0
+        self.__saveRental()
+        return task.done
+
+    def __stopRental(self, announce):
+        taskMgr.remove(self.uniqueName('rentalEnd'))
+        for obj in self.rentalObjects:
+            try:
+                obj.requestDelete()
+            except Exception as e:
+                self.notify.warning('Could not remove rental object: %s' % e)
+        if self.rentalObjects and announce:
+            if self.rentalType == ToontownGlobals.RentalCannon:
+                self.sendUpdate('cannonsOver', [])
+            elif self.rentalType == ToontownGlobals.RentalGameTable:
+                self.sendUpdate('gameTableOver', [])
+        self.rentalObjects = []
+
+    def cleanupRentals(self):
+        """Estate unloading: remove the rented items but keep the time left."""
+        self.__stopRental(announce=False)

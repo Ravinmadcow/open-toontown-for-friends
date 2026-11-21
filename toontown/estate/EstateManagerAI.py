@@ -160,7 +160,14 @@ class EstateManagerAI(DistributedObjectAI):
                 toon.b_setHouseId(house.getDoId())
 
         instance.ready = True
-        self.estate[instance.ownerId] = estate
+        # Catalogue rentals look the estate up by toon, so list every toon on the account.
+        instance.toonIds = [avId for avId in avList if avId]
+        for avId in instance.toonIds + [instance.ownerId]:
+            self.estate[avId] = estate
+        try:
+            estate.loadRental(instance.accountId)
+        except Exception as e:
+            self.notify.warning('Could not restore rental: %s' % e)
         self.notify.info('Loaded estate for account %s in zone %s' % (instance.accountId, instance.zoneId))
 
         waiting, instance.waiting = instance.waiting, []
@@ -229,10 +236,15 @@ class EstateManagerAI(DistributedObjectAI):
             house.requestDelete()
         instance.houses = []
         if instance.estate is not None:
+            try:
+                instance.estate.cleanupRentals()
+            except Exception as e:
+                self.notify.warning('Could not clean up rentals: %s' % e)
+            for avId in list(self.estate):
+                if self.estate[avId] is instance.estate:
+                    del self.estate[avId]
             instance.estate.requestDelete()
             instance.estate = None
-        if self.estate.get(instance.ownerId) is not None:
-            del self.estate[instance.ownerId]
         self.accountId2estate.pop(instance.accountId, None)
         self.zoneId2estate.pop(instance.zoneId, None)
         self.air.deallocateZone(instance.zoneId)
