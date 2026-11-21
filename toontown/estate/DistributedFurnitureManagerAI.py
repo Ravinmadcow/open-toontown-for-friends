@@ -1,8 +1,26 @@
 from direct.directnotify import DirectNotifyGlobal
 from direct.distributed.DistributedObjectAI import DistributedObjectAI
 
-from toontown.catalog.CatalogFurnitureItem import CatalogFurnitureItem
+from toontown.catalog.CatalogFurnitureItem import CatalogFurnitureItem, FLBank, FLCloset, FLTrunk
 from toontown.estate.DistributedFurnitureItemAI import DistributedFurnitureItemAI
+
+
+def getItemClass(item):
+    """Picks the server object for a piece of furniture: special items get their own class."""
+    flags = item.getFlags()
+    if flags & FLBank:
+        from toontown.estate.DistributedBankAI import DistributedBankAI
+        return DistributedBankAI
+    if flags & FLTrunk:
+        from toontown.estate.DistributedTrunkAI import DistributedTrunkAI
+        return DistributedTrunkAI
+    if flags & FLCloset:
+        from toontown.estate.DistributedClosetAI import DistributedClosetAI
+        return DistributedClosetAI
+    return DistributedFurnitureItemAI
+
+# Girls get the girls' wardrobe and trunk.
+GIRL_SWAPS = {500: 510, 4000: 4010}
 
 # Starting furniture: (furniture type, (x, y, z, h, p, r)).
 # Main room is roughly x -19..16, y -26..3; bedroom is x -24..-1, y 3..26.
@@ -37,8 +55,13 @@ class DistributedFurnitureManagerAI(DistributedObjectAI):
         self.items = []
 
     def createDefaultFurniture(self):
+        owner = self.air.doId2do.get(self.ownerId)
+        isGirl = owner is not None and owner.getStyle().gender == 'f'
         for furnitureType, posHpr in DEFAULT_FURNITURE:
-            item = DistributedFurnitureItemAI(self.air, self, CatalogFurnitureItem(furnitureType), posHpr)
+            if isGirl:
+                furnitureType = GIRL_SWAPS.get(furnitureType, furnitureType)
+            catalogItem = CatalogFurnitureItem(furnitureType)
+            item = getItemClass(catalogItem)(self.air, self, catalogItem, posHpr)
             item.generateWithRequired(self.zoneId)
             self.items.append(item)
 
