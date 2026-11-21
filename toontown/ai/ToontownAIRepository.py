@@ -38,6 +38,8 @@ from toontown.pets.PetManagerAI import PetManagerAI
 from toontown.quest.QuestManagerAI import QuestManagerAI
 from toontown.racing import RaceGlobals
 from toontown.fishing.DistributedFishingPondAI import DistributedFishingPondAI
+from toontown.fishing.FishManagerAI import FishManagerAI
+from toontown.safezone.DistributedFishingSpotAI import DistributedFishingSpotAI
 from toontown.racing.DistributedLeaderBoardAI import DistributedLeaderBoardAI
 from toontown.racing.DistributedRacePadAI import DistributedRacePadAI
 from toontown.racing.DistributedStartingBlockAI import DistributedStartingBlockAI
@@ -157,6 +159,9 @@ class ToontownAIRepository(ToontownInternalRepository):
 
         # Create our quest manager...
         self.questManager = QuestManagerAI(self)
+
+        # Decides fishing catches and buys fish.
+        self.fishManager = FishManagerAI(self)
 
         # Create our promotion manager...
         self.promotionMgr = PromotionManagerAI(self)
@@ -411,7 +416,20 @@ class ToontownAIRepository(ToontownInternalRepository):
         return fishingPonds, fishingPondGroups
 
     def findFishingSpots(self, dnaData, pond):
-        return []  # TODO
+        fishingSpots = []
+        if 'fishing_spot' in dnaData.getName():
+            spot = DistributedFishingSpotAI(self, pond)
+            x, y, z = dnaData.getPos()
+            h, p, r = dnaData.getHpr()
+            spot.setPosHpr(x, y, z, h, p, r)
+            spot.generateWithRequired(pond.zoneId)
+            pond.addSpot(spot)
+            fishingSpots.append(spot)
+
+        for i in range(dnaData.getNumChildren()):
+            fishingSpots.extend(self.findFishingSpots(dnaData.at(i), pond))
+
+        return fishingSpots
 
     def findPartyHats(self, dnaData, zoneId):
         return []  # TODO

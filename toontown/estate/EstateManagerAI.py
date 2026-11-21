@@ -19,6 +19,7 @@ class EstateInstance:
         self.visitors = set()
         self.ready = False
         self.waiting = []  # avIds waiting for this estate to finish loading
+        self.ponds = []
 
 
 class EstateManagerAI(DistributedObjectAI):
@@ -38,6 +39,7 @@ class EstateManagerAI(DistributedObjectAI):
         self.zoneId2estate = {}
         self.avId2estate = {}   # which estate each toon is currently in
         self.estate = {}        # ownerAvId -> DistributedEstateAI (used by catalog code)
+        self.pondGroups = None  # fishing pond layout from the estate DNA, loaded once
 
     # ---- client requests ----------------------------------------------------
     def getEstateZone(self, avId, name):
@@ -130,6 +132,11 @@ class EstateManagerAI(DistributedObjectAI):
         estate.generateWithRequired(instance.zoneId)
         instance.estate = estate
 
+        try:
+            self.__createPonds(instance)
+        except Exception as e:
+            self.notify.warning('Could not set up the estate fishing pond: %s' % e)
+
         for slot in range(NUM_HOUSES):
             avId = avList[slot]
             house = DistributedHouseAI(self.air)
@@ -182,7 +189,38 @@ class EstateManagerAI(DistributedObjectAI):
         if not instance.visitors and instance.ready:
             self.__unload(instance)
 
+    # ---- fishing ------------------------------------------------------------
+    def __findPondGroups(self, dnaData, found):
+        if 'fishing_pond' in dnaData.getName():
+            found.append(dnaData)
+            return
+        for i in range(dnaData.getNumChildren()):
+            self.__findPondGroups(dnaData.at(i), found)
+
+    def __createPonds(self, instance):
+        from panda3d.toontown import DNAStorage
+        from toontown.fishing.DistributedFishingPondAI import DistributedFishingPondAI
+        from toontown.toonbase import ToontownGlobals
+        if self.pondGroups is None:
+            self.pondGroups = []
+            dnaFile = self.air.lookupDNAFileName('estate_1.dna')
+            self.dnaStore = DNAStorage()
+            self.dnaData = self.air.loadDNAFileAI(self.dnaStore, dnaFile)
+            self.__findPondGroups(self.dnaData, self.pondGroups)
+        for group in self.pondGroups:
+            pond = DistributedFishingPondAI(self.air)
+            pond.setArea(ToontownGlobals.MyEstate)
+            pond.generateWithRequired(instance.zoneId)
+            self.air.findFishingSpots(group, pond)
+            instance.ponds.append(pond)
+
     def __unload(self, instance):
+        for pond in instance.ponds:
+            try:
+                pond.cleanup()
+            except Exception as e:
+                self.notify.warning('Could not clean up pond: %s' % e)
+        instance.ponds = []
         for house in instance.houses:
             try:
                 house.cleanupInterior()
