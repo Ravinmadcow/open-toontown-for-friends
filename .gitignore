@@ -21,3 +21,7 @@ PPYTHON_PATH
 local/
 errorCode
 /start_game.bat
+# Each player's own username and server address
+win32/my_settings.bat
+# Backups made while editing
+*.bak
