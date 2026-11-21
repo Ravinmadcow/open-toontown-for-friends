@@ -1,11 +1,13 @@
 from direct.directnotify import DirectNotifyGlobal
 from direct.distributed.DistributedObjectAI import DistributedObjectAI
 
+from toontown.building import DoorTypes
+
 
 class DistributedHouseAI(DistributedObjectAI):
     """
-    One house on an estate. Stage 1: shows the house with its owner's name
-    and colour. Doors, interiors and furniture come with stage 2.
+    One house on an estate: the outside (name, colour), its front door, and
+    for houses that belong to a toon, an interior with starting furniture.
     """
     notify = DirectNotifyGlobal.directNotify.newCategory('DistributedHouseAI')
 
@@ -25,6 +27,11 @@ class DistributedHouseAI(DistributedObjectAI):
         self.interiorWindows = b''
         self.deletedItems = b''
         self.cannonEnabled = 0
+        self.interiorZone = None
+        self.interior = None
+        self.furnitureMgr = None
+        self.door = None
+        self.insideDoor = None
 
     def setHousePos(self, pos):
         self.housePos = pos
@@ -112,3 +119,41 @@ class DistributedHouseAI(DistributedObjectAI):
 
     def d_setHouseReady(self):
         self.sendUpdate('setHouseReady', [])
+
+    # ---- interior (stage 2) -----------------------------------------------------
+    def setupInterior(self, estateZoneId):
+        # Imported here so the estate still loads if anything below is missing.
+        from toontown.estate.DistributedHouseInteriorAI import DistributedHouseInteriorAI
+        from toontown.estate.DistributedFurnitureManagerAI import DistributedFurnitureManagerAI
+        from toontown.estate.DistributedHouseDoorAI import DistributedHouseDoorAI
+
+        self.interiorZone = self.air.allocateZone()
+
+        self.interior = DistributedHouseInteriorAI(self.air, self)
+        self.interior.generateWithRequired(self.interiorZone)
+
+        self.furnitureMgr = DistributedFurnitureManagerAI(self.air, self, self.interior)
+        self.furnitureMgr.generateWithRequired(self.interiorZone)
+        self.furnitureMgr.createDefaultFurniture()
+
+        door = DistributedHouseDoorAI(self.air, self.getDoId(), DoorTypes.EXT_STANDARD)
+        insideDoor = DistributedHouseDoorAI(self.air, self.getDoId(), DoorTypes.INT_STANDARD)
+        door.setOtherDoor(insideDoor)
+        insideDoor.setOtherDoor(door)
+        door.zoneId = estateZoneId
+        insideDoor.zoneId = self.interiorZone
+        door.generateWithRequired(estateZoneId)
+        insideDoor.generateWithRequired(self.interiorZone)
+        self.door = door
+        self.insideDoor = insideDoor
+
+    def cleanupInterior(self):
+        for obj in (self.door, self.insideDoor, self.interior):
+            if obj is not None:
+                obj.requestDelete()
+        if self.furnitureMgr is not None:
+            self.furnitureMgr.cleanup()
+        self.door = self.insideDoor = self.interior = self.furnitureMgr = None
+        if self.interiorZone is not None:
+            self.air.deallocateZone(self.interiorZone)
+            self.interiorZone = None

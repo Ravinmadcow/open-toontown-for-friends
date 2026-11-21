@@ -1,3 +1,4 @@
+from panda3d.otp import NametagGroup, NametagGlobals
 from toontown.estate import PlantingGUI
 from direct.gui.DirectGui import *
 from panda3d.core import *

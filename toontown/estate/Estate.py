@@ -1,3 +1,4 @@
+from toontown.toonbase import ToontownGlobals
 from panda3d.core import *
 from direct.interval.IntervalGlobal import *
 from toontown.toonbase.ToonBaseGlobal import *

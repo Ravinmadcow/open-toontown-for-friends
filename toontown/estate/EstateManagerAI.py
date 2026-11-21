@@ -27,8 +27,8 @@ class EstateManagerAI(DistributedObjectAI):
     zone, with a house for each toon slot. The estate is unloaded again when
     everyone has left.
 
-    Houses are created fresh each time for now (no furniture saved yet);
-    saved houses and interiors come with stage 2.
+    Houses that belong to a toon get a working front door and an interior
+    with starting furniture. Everything is created fresh each visit.
     """
     notify = DirectNotifyGlobal.directNotify.newCategory('EstateManagerAI')
 
@@ -141,6 +141,11 @@ class EstateManagerAI(DistributedObjectAI):
             house.generateWithRequired(instance.zoneId)
             house.d_setHouseReady()
             instance.houses.append(house)
+            if avId:
+                try:
+                    house.setupInterior(instance.zoneId)
+                except Exception as e:
+                    self.notify.warning('Could not set up interior for house %s: %s' % (slot, e))
 
             # Let each online toon on this account know which house is theirs.
             toon = self.air.doId2do.get(avId) if avId else None
@@ -179,6 +184,10 @@ class EstateManagerAI(DistributedObjectAI):
 
     def __unload(self, instance):
         for house in instance.houses:
+            try:
+                house.cleanupInterior()
+            except Exception as e:
+                self.notify.warning('Could not clean up house interior: %s' % e)
             house.requestDelete()
         instance.houses = []
         if instance.estate is not None:
