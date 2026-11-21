@@ -657,6 +657,10 @@ class Place(StateData, FriendsListManager):
 
     def getEstateZoneAndGoHome(self, requestStatus):
         self.doneStatus = requestStatus
+        if not hasattr(base.cr, 'estateMgr'):
+            # Estates aren't built into Open Toontown's server yet; send the toon back instead of crashing.
+            self.goHomeFailed(None)
+            return
         avId = requestStatus['avId']
         self.acceptOnce('setLocalEstateZone', self.goHome)
         if avId > 0:

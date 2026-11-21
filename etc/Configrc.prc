@@ -101,3 +101,7 @@ server-data-folder data
 # TEMPORARY
 skip-friend-quest true
 skip-phone-quest true
+
+# Holidays (server). Winter decorations switch on by themselves 1 Dec - 2 Jan.
+# force-holidays turns holidays on now: 4 = Winter Decorations. Delete the line to stop.
+force-holidays 4

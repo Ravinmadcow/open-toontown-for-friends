@@ -97,6 +97,8 @@ cr.music = music
 del music
 base.initNametagGlobals()
 base.cr = cr
+from toontown.toonbase import GamepadSupport
+base.gamepadSupport = GamepadSupport.start()
 loader.endBulkLoad('init')
 from otp.distributed.OtpDoGlobals import OTP_DO_ID_FRIEND_MANAGER
 cr.generateGlobalObject(OTP_DO_ID_FRIEND_MANAGER, 'FriendManager')

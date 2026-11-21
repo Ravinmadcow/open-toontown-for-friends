@@ -600,10 +600,7 @@ class DistributedToonAI(DistributedPlayerAI.DistributedPlayerAI, DistributedSmoo
     def setFriendsList(self, friendsList):
         self.notify.debug('setting friends list to %s' % self.friendsList)
         self.friendsList = friendsList
-        if friendsList:
-            friendId = friendsList[-1]
-            otherAv = self.air.doId2do.get(friendId)
-            self.air.questManager.toonMadeFriend(self, otherAv)
+        # Friend quest progress is handled by FriendManagerAI when a friendship is made.
 
     def getFriendsList(self):
         return self.friendsList
