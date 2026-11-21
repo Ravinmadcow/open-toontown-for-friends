@@ -3,7 +3,7 @@ from direct.distributed.DistributedObjectAI import DistributedObjectAI
 
 from toontown.catalog import CatalogItem
 from toontown.catalog.CatalogItemList import CatalogItemList
-from toontown.catalog.CatalogFurnitureItem import CatalogFurnitureItem, FLBank, FLCloset, FLTrunk
+from toontown.catalog.CatalogFurnitureItem import CatalogFurnitureItem, FLBank, FLCloset, FLTrunk, FLPhone
 from toontown.catalog.CatalogSurfaceItem import CatalogSurfaceItem, NUM_ST_TYPES
 from toontown.catalog.CatalogWindowItem import CatalogWindowItem
 from toontown.estate import HouseStorageAI
@@ -23,6 +23,9 @@ def getItemClass(item):
     if flags & FLCloset:
         from toontown.estate.DistributedClosetAI import DistributedClosetAI
         return DistributedClosetAI
+    if flags & FLPhone:
+        from toontown.estate.DistributedPhoneAI import DistributedPhoneAI
+        return DistributedPhoneAI
     return DistributedFurnitureItemAI
 
 
@@ -105,6 +108,27 @@ class DistributedFurnitureManagerAI(DistributedObjectAI):
             item.requestDelete()
         self.items = []
         self.requestDelete()
+
+    # ---- deliveries from the mailbox ----------------------------------------
+    def getNumHouseItems(self):
+        return len(self.items) + len(self.atticItems) + len(self.atticWallpaper) + len(self.atticWindows)
+
+    def addAtticItem(self, catalogItem):
+        catalogItem.posHpr = None
+        self.atticItems.append(catalogItem)
+        self.d_setAtticItems()
+        self.saveHouse()
+
+    def addWallpaper(self, catalogItem):
+        self.atticWallpaper.append(catalogItem)
+        self.d_setAtticWallpaper()
+        self.saveHouse()
+
+    def addWindow(self, catalogItem):
+        catalogItem.placement = None
+        self.atticWindows.append(catalogItem)
+        self.d_setAtticWindows()
+        self.saveHouse()
 
     # ---- saving -------------------------------------------------------------
     def saveHouse(self):

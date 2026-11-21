@@ -19,11 +19,11 @@ class DistributedHouseAI(DistributedObjectAI):
         self.avatarId = 0
         self.name = ''
         self.color = 0
-        self.atticItems = b''
-        self.interiorItems = b''
-        self.atticWallpaper = b''
+        self._atticItemsBlob = b''
+        self._interiorItemsBlob = b''
+        self._atticWallpaperBlob = b''
         self.interiorWallpaper = b''
-        self.atticWindows = b''
+        self._atticWindowsBlob = b''
         self.interiorWindows = b''
         self.deletedItems = b''
         self.cannonEnabled = 0
@@ -32,6 +32,7 @@ class DistributedHouseAI(DistributedObjectAI):
         self.furnitureMgr = None
         self.door = None
         self.insideDoor = None
+        self.mailbox = None
 
     def setHousePos(self, pos):
         self.housePos = pos
@@ -70,22 +71,22 @@ class DistributedHouseAI(DistributedObjectAI):
         return self.color
 
     def setAtticItems(self, items):
-        self.atticItems = items
+        self._atticItemsBlob = items
 
     def getAtticItems(self):
-        return self.atticItems
+        return self._atticItemsBlob
 
     def setInteriorItems(self, items):
-        self.interiorItems = items
+        self._interiorItemsBlob = items
 
     def getInteriorItems(self):
-        return self.interiorItems
+        return self._interiorItemsBlob
 
     def setAtticWallpaper(self, items):
-        self.atticWallpaper = items
+        self._atticWallpaperBlob = items
 
     def getAtticWallpaper(self):
-        return self.atticWallpaper
+        return self._atticWallpaperBlob
 
     def setInteriorWallpaper(self, items):
         self.interiorWallpaper = items
@@ -94,10 +95,10 @@ class DistributedHouseAI(DistributedObjectAI):
         return self.interiorWallpaper
 
     def setAtticWindows(self, items):
-        self.atticWindows = items
+        self._atticWindowsBlob = items
 
     def getAtticWindows(self):
-        return self.atticWindows
+        return self._atticWindowsBlob
 
     def setInteriorWindows(self, items):
         self.interiorWindows = items
@@ -151,14 +152,49 @@ class DistributedHouseAI(DistributedObjectAI):
         self.door = door
         self.insideDoor = insideDoor
 
+        # The mailbox out front, for catalogue deliveries.
+        from toontown.estate.DistributedMailboxAI import DistributedMailboxAI
+        self.mailbox = DistributedMailboxAI(self.air, self)
+        self.mailbox.generateWithRequired(estateZoneId)
+
     def cleanupInterior(self):
         # The furniture manager saves the house as it cleans up.
         if self.furnitureMgr is not None:
             self.furnitureMgr.cleanup()
-        for obj in (self.door, self.insideDoor, self.interior):
+        for obj in (self.door, self.insideDoor, self.interior, self.mailbox):
             if obj is not None:
                 obj.requestDelete()
+        self.mailbox = None
         self.door = self.insideDoor = self.interior = self.furnitureMgr = None
         if self.interiorZone is not None:
             self.air.deallocateZone(self.interiorZone)
             self.interiorZone = None
+
+    # ---- used by catalogue items when they are accepted from the mailbox ----
+    @property
+    def atticItems(self):
+        return self.furnitureMgr.atticItems if self.furnitureMgr else []
+
+    @property
+    def atticWallpaper(self):
+        return self.furnitureMgr.atticWallpaper if self.furnitureMgr else []
+
+    @property
+    def atticWindows(self):
+        return self.furnitureMgr.atticWindows if self.furnitureMgr else []
+
+    @property
+    def interiorItems(self):
+        return [item.item for item in self.furnitureMgr.items] if self.furnitureMgr else []
+
+    def addAtticItem(self, catalogItem):
+        if self.furnitureMgr:
+            self.furnitureMgr.addAtticItem(catalogItem)
+
+    def addWallpaper(self, catalogItem):
+        if self.furnitureMgr:
+            self.furnitureMgr.addWallpaper(catalogItem)
+
+    def addWindow(self, catalogItem):
+        if self.furnitureMgr:
+            self.furnitureMgr.addWindow(catalogItem)
