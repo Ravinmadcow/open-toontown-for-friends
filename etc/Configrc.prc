@@ -110,4 +110,4 @@ force-holidays 4
 gag-xp-multiplier 2
 
 # Jellybeans from trolley games, fishing and ToonTask rewards: 1 = normal, 2 = twice as many.
-jellybean-multiplier 1
+jellybean-multiplier 3
