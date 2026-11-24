@@ -1,5 +1,5 @@
 from direct.showbase.ShowBase import ShowBase
-from panda3d.core import Camera, TPLow, VBase4, ColorWriteAttrib, Filename, getModelPath, NodePath, ConfigVariableBool, ConfigVariableDouble
+from panda3d.core import Notify, Camera, TPLow, VBase4, ColorWriteAttrib, Filename, getModelPath, NodePath, ConfigVariableBool, ConfigVariableDouble
 from . import OTPRender
 import time
 import math
@@ -41,6 +41,41 @@ class OTPBase(ShowBase):
                 base.cam.node().setCameraMask(OTPRender.MainCameraBitmask | OTPRender.EnviroCameraBitmask)
         taskMgr.setupTaskChain('net')
         return
+
+    # ---- crash guard for a Panda3D engine bug ---------------------------------
+    # Every so often Panda3D fails an internal check while drawing a frame
+    # ("_cdata->_last_update == _cdata->_next_update" in pandaNode.I): a node's
+    # cached bounds went stale mid-frame. It's harmless (the next frame
+    # recalculates them), but the engine reports it as an AssertionError, which
+    # used to close the game. This skips that one frame instead.
+    STALE_BOUNDS_ASSERT = '_last_update == _cdata->_next_update'
+
+    def restart(self, *args, **kwargs):
+        ShowBase.restart(self, *args, **kwargs)
+        self.installSafeRenderLoop()
+
+    def installSafeRenderLoop(self):
+        originalLoop = getattr(self, '_ShowBase__igLoop', None)
+        tasks = self.taskMgr.getTasksNamed('igLoop')
+        if originalLoop is None or not tasks:
+            return
+        sort = tasks[0].getSort()
+        priority = tasks[0].getPriority()
+        self.skippedFrames = 0
+
+        def safeIgLoop(task):
+            try:
+                return originalLoop(task)
+            except AssertionError as e:
+                if self.STALE_BOUNDS_ASSERT not in str(e):
+                    raise
+                Notify.ptr().clearAssertFailed()
+                self.skippedFrames += 1
+                self.notify.warning('Skipped a frame after a Panda3D bounds error (%d so far).' % self.skippedFrames)
+                return task.cont
+
+        self.taskMgr.remove('igLoop')
+        self.taskMgr.add(safeIgLoop, 'igLoop', sort=sort, priority=priority)
 
     def setTaskChainNetThreaded(self):
         if base.config.GetBool('want-threaded-network', 0):

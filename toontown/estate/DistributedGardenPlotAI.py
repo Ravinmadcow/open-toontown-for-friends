@@ -11,6 +11,7 @@ class DistributedGardenPlotAI(DistributedLawnDecorAI):
     def __init__(self, air, garden, plot, x, y, h):
         DistributedLawnDecorAI.__init__(self, air, garden, plot, x, y, h)
         self.pendingFlower = None
+        self.pendingTree = None
 
     def plantFlower(self, species, variety):
         avId = self.air.getAvatarIdFromSender()
@@ -46,9 +47,32 @@ class DistributedGardenPlotAI(DistributedLawnDecorAI):
         self.movieAvId = avId
         self.d_setMovie(GardenGlobals.MOVIE_PLANT_REJECTED, avId)
 
-    # Gag trees and statues come in the next gardening round.
     def plantGagTree(self, track, level):
-        self.d_interactionDenied(self.air.getAvatarIdFromSender())
+        # Planting a gag tree uses up one of that gag from your inventory.
+        from toontown.toonbase import ToontownBattleGlobals
+        avId = self.air.getAvatarIdFromSender()
+        av = self.air.doId2do.get(avId)
+        if av is None or not self.isOwner(avId) or self.movieAvId:
+            self.d_interactionDenied(avId)
+            return
+        hardPoint = GardenGlobals.estatePlots[self.garden.slot][self.plot]
+        allowed = (hardPoint[3] == GardenGlobals.GAG_TREE_TYPE
+                   and 0 <= track < ToontownBattleGlobals.NUM_GAG_TRACKS
+                   and 0 <= level <= ToontownBattleGlobals.UBER_GAG_LEVEL_INDEX
+                   and av.hasTrackAccess(track)
+                   and av.inventory.numItem(track, level) > 0
+                   and self.garden.getTree(track, level) is None
+                   and self.garden.hasRequiredTrees(track, level))
+        self.movieAvId = avId
+        if not allowed:
+            self.d_setMovie(GardenGlobals.MOVIE_PLANT_REJECTED, avId)
+            return
+        av.inventory.useItem(track, level)
+        av.b_setInventory(av.inventory.makeNetString())
+        self.pendingTree = GardenGlobals.getTreeTypeIndex(track, level)
+        self.d_setMovie(GardenGlobals.MOVIE_PLANT, avId)
+
+    # Statues come in a later gardening round.
 
     def plantStatuary(self, species):
         self.d_interactionDenied(self.air.getAvatarIdFromSender())
@@ -60,7 +84,12 @@ class DistributedGardenPlotAI(DistributedLawnDecorAI):
         avId = self.air.getAvatarIdFromSender()
         if avId != self.movieAvId:
             return
-        if self.pendingFlower is not None:
+        if self.pendingTree is not None:
+            typeIndex = self.pendingTree
+            self.pendingTree = None
+            self.movieAvId = 0
+            self.garden.plantGagTree(self, typeIndex, avId)
+        elif self.pendingFlower is not None:
             species, variety = self.pendingFlower
             self.pendingFlower = None
             self.movieAvId = 0
