@@ -29,7 +29,8 @@ def determineFriendName(friendTuple):
         avId, flags, playerId, showType = friendTuple
     if showType == 1 and playerId:
         playerInfo = base.cr.playerFriendsManager.playerId2Info.get(playerId)
-        friendName = playerInfo.playerName
+        if playerInfo is not None:
+            friendName = playerInfo.playerName
     else:
         hasManager = hasattr(base.cr, 'playerFriendsManager')
         handle = base.cr.identifyFriend(avId)
@@ -41,11 +42,14 @@ def determineFriendName(friendTuple):
 
 
 def compareFriends(f1, f2):
+    # Entries whose name isn't known yet sort last (Python 3 can't compare None).
     name1 = determineFriendName(f1)
     name2 = determineFriendName(f2)
-    if name1 > name2:
+    key1 = (name1 is None, (name1 or '').lower())
+    key2 = (name2 is None, (name2 or '').lower())
+    if key1 > key2:
         return 1
-    elif name1 == name2:
+    elif key1 == key2:
         return 0
     else:
         return -1
