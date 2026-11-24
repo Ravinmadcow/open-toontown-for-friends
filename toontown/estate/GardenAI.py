@@ -6,6 +6,7 @@ nobody is around ('garden-day-minutes' in etc/Configrc.prc sets how long a
 garden day is; the default is a real day).
 """
 import json
+import math
 import os
 import time
 
@@ -17,6 +18,13 @@ from toontown.estate import GardenGlobals
 notify = DirectNotifyGlobal.directNotify.newCategory('GardenAI')
 
 MAX_CATCH_UP_DAYS = 14
+
+# Flower spots are stored as (box number, spot in box), not as map positions.
+# These are the spots' offsets along each flower box, measured from the box
+# models (planterA holds 3, planterC holds 2, planterD holds 1).
+FLOWER_SPOT_OFFSETS = {GardenGlobals.BOX_THREE: (-3.9, 0.0, 3.9),
+                       GardenGlobals.BOX_TWO: (-2.25, 2.25),
+                       GardenGlobals.BOX_ONE: (0.0,)}
 
 
 def _dayLength():
@@ -88,7 +96,8 @@ class GardenAI:
             self.boxes.append(box)
 
         for plot, hardPoint in enumerate(GardenGlobals.estatePlots[self.slot]):
-            x, y, h, plotType = hardPoint[:4]
+            plotType = hardPoint[3]
+            x, y, h = self.plotPosition(plot)
             if plotType not in (GardenGlobals.FLOWER_TYPE, GardenGlobals.GAG_TREE_TYPE):
                 continue  # statues come in a later round
             plant = saved.get(plot)
@@ -109,6 +118,18 @@ class GardenAI:
         self.updateTrackBonus()
         taskMgr.doMethodLater(60, self.__checkDay, 'garden-day-%d' % id(self))
 
+    def plotPosition(self, plot):
+        """Where a garden spot is on the estate map: (x, y, heading)."""
+        hardPoint = GardenGlobals.estatePlots[self.slot][plot]
+        if hardPoint[3] != GardenGlobals.FLOWER_TYPE:
+            return hardPoint[0], hardPoint[1], hardPoint[2]
+        boxIndex, spot = int(hardPoint[0]), int(hardPoint[1])
+        bx, by, bh, boxType = GardenGlobals.estateBoxes[self.slot][boxIndex]
+        offsets = FLOWER_SPOT_OFFSETS.get(boxType, (0.0,))
+        offset = offsets[spot] if spot < len(offsets) else 0.0
+        angle = math.radians(bh)
+        return bx + offset * math.cos(angle), by + offset * math.sin(angle), bh
+
     def __makePlant(self, plot, x, y, h, species, variety, water=0, growth=0):
         if GardenGlobals.PlantAttributes[species]['plantType'] == GardenGlobals.GAG_TREE_TYPE:
             from toontown.estate.DistributedGagTreeAI import DistributedGagTreeAI
@@ -118,7 +139,7 @@ class GardenAI:
 
     def __makePlot(self, plot):
         from toontown.estate.DistributedGardenPlotAI import DistributedGardenPlotAI
-        x, y, h = GardenGlobals.estatePlots[self.slot][plot][:3]
+        x, y, h = self.plotPosition(plot)
         obj = DistributedGardenPlotAI(self.air, self, plot, x, y, h)
         obj.generateWithRequired(self.zoneId)
         self.objects[plot] = obj
