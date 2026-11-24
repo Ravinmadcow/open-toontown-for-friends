@@ -9,6 +9,7 @@ from toontown.toonbase import ToontownGlobals
 # The winter season runs across New Year, so it is checked specially below.
 AUTO_HOLIDAYS = [
     (ToontownGlobals.WINTER_DECORATIONS, (12, 1), (1, 2)),
+    (ToontownGlobals.WINTER_CAROLING, (12, 14), (1, 4)),
 ]
 
 
@@ -60,8 +61,22 @@ class NewsManagerAI(DistributedObjectAI):
         manager = getattr(self.air, 'holidayManager', None)
         if manager is not None:
             manager.currentHolidays = {holidayId: True for holidayId in ids}
+        self.__updateWinterCaroling(ids)
         self.notify.warning('Active holidays: %s' % (ids or 'none'))
         self.sendUpdate('setHolidayIdList', [ids])
+
+    def __updateWinterCaroling(self, ids):
+        from toontown.ai.WinterCarolingMgrAI import WinterCarolingMgrAI
+        if getattr(self.air, 'winterCarolingMgr', None) is None:
+            self.air.winterCarolingMgr = WinterCarolingMgrAI(self.air)
+        caroling = ToontownGlobals.WINTER_CAROLING in ids or ToontownGlobals.WACKY_WINTER_CAROLING in ids
+        try:
+            if caroling:
+                self.air.winterCarolingMgr.start()
+            else:
+                self.air.winterCarolingMgr.stop()
+        except Exception as e:
+            self.notify.warning('Could not update Winter Caroling: %s' % e)
 
     def __checkHolidays(self, task):
         self.updateHolidays()
