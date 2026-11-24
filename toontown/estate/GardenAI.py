@@ -164,22 +164,29 @@ class GardenAI:
         self.objects[plot] = obj
         return obj
 
+    def growNow(self, days=1):
+        """Garden Accelerator: everything grows as if a day had passed."""
+        self.__growDays(days)
+
     def __checkDay(self, task):
         today = _today()
         if today > self.lastDay:
             days = min(today - self.lastDay, MAX_CATCH_UP_DAYS)
             self.lastDay = today
-            for obj in self.objects.values():
-                if hasattr(obj, 'growOneDay'):
-                    for i in range(days):
-                        obj.growOneDay()
-                    obj.b_setWaterLevel(obj.waterLevel)
-                    obj.b_setGrowthLevel(obj.growthLevel)
-                    if hasattr(obj, 'lastWilted'):
-                        obj.lastWilted = obj.isWilted()
-            self.save()
-            self.updateTrackBonus()
+            self.__growDays(days)
         return task.again
+
+    def __growDays(self, days):
+        for obj in self.objects.values():
+            if hasattr(obj, 'growOneDay'):
+                for i in range(days):
+                    obj.growOneDay()
+                obj.b_setWaterLevel(obj.waterLevel)
+                obj.b_setGrowthLevel(obj.growthLevel)
+                if hasattr(obj, 'lastWilted'):
+                    obj.lastWilted = obj.isWilted()
+        self.save()
+        self.updateTrackBonus()
 
     def cleanup(self):
         taskMgr.remove('garden-day-%d' % id(self))

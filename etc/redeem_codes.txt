@@ -1,0 +1,15 @@
+# Codes for the Options page > Codes screen in the Shticker Book.
+# One code per line:   CODE   reward [reward ...]   [expires=YYYY-MM-DD]
+#
+# Rewards arrive in the toon's mailbox:
+#   beans:500                          a jar of 500 jellybeans
+#   item:CatalogFurnitureItem(100)     any catalogue item, written the way the
+#                                      catalogue code writes it, e.g.
+#                                      item:CatalogClothingItem(1001,0)
+#                                      item:CatalogEmoteItem(5)
+# Each toon can use each code once. Codes aren't case-sensitive.
+# Changes take effect straight away - no restart needed.
+#
+# Examples (remove the # to switch one on):
+# WELCOME          beans:500
+# SNOWDAY2026      beans:250  expires=2027-01-04

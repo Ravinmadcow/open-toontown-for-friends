@@ -3612,7 +3612,8 @@ class DistributedToonAI(DistributedPlayerAI.DistributedPlayerAI, DistributedSmoo
         self.sendUpdate('useSpecialResponse', [response])
 
     def tryToUseSpecial(self, special):
-        estateOwnerDoId = simbase.air.estateMgr.zone2owner.get(self.zoneId)
+        # The Garden Accelerator, used from the Shticker Book: your own garden
+        # grows a whole day straight away. You must be at your estate.
         response = 'badlocation'
         doIHaveThisSpecial = False
         for curSpecial in self.gardenSpecials:
@@ -3622,18 +3623,16 @@ class DistributedToonAI(DistributedPlayerAI.DistributedPlayerAI, DistributedSmoo
 
         if not doIHaveThisSpecial:
             return response
-        if not self.doId == estateOwnerDoId:
-            self.notify.warning("how did this happen, planting an item you don't own")
+        estate = simbase.air.estateMgr.estate.get(self.doId)
+        if estate is None or estate.zoneId != self.zoneId:
             return response
-        if estateOwnerDoId:
-            estate = simbase.air.estateMgr.estate.get(estateOwnerDoId)
-            if estate and hasattr(estate, 'avIdList'):
-                ownerIndex = estate.avIdList.index(estateOwnerDoId)
-                if ownerIndex >= 0:
-                    estate.doEpochNow(onlyForThisToonIndex=ownerIndex)
-                    self.removeGardenItem(special, 1)
-                    response = 'success'
-                    self.air.writeServerEvent('garden_fertilizer', self.doId, '')
+        for garden in list(getattr(estate, 'gardens', {}).values()):
+            if garden.ownerId == self.doId:
+                garden.growNow()
+                self.removeGardenItem(special, 1)
+                response = 'success'
+                self.air.writeServerEvent('garden_fertilizer', self.doId, '')
+                break
         return response
 
     def sendGardenEvent(self):

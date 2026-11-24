@@ -229,6 +229,11 @@ class ToontownAIRepository(ToontownInternalRepository):
         self.trophyMgr = DistributedTrophyMgrAI(self)
         self.trophyMgr.generateWithRequired(OTP_ZONE_ID_MANAGEMENT)
 
+        # Generate our code redemption manager (codes are in etc/redeem_codes.txt)...
+        from toontown.coderedemption.TTCodeRedemptionMgrAI import TTCodeRedemptionMgrAI
+        self.codeRedemptionMgr = TTCodeRedemptionMgrAI(self)
+        self.codeRedemptionMgr.generateWithRequired(OTP_ZONE_ID_MANAGEMENT)
+
         # Generate our safezone manager...
         self.safeZoneManager = SafeZoneManagerAI(self)
         self.safeZoneManager.generateWithRequired(OTP_ZONE_ID_MANAGEMENT)
