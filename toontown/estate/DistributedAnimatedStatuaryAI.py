@@ -1,5 +1,8 @@
 from direct.directnotify import DirectNotifyGlobal
-from direct.distributed.DistributedObjectAI import DistributedObjectAI
 
-class DistributedAnimatedStatuaryAI(DistributedObjectAI):
+from toontown.estate.DistributedStatuaryAI import DistributedStatuaryAI
+
+
+class DistributedAnimatedStatuaryAI(DistributedStatuaryAI):
+    """A moving statue, like the Flappy Cog. The client plays the animation."""
     notify = DirectNotifyGlobal.directNotify.newCategory('DistributedAnimatedStatuaryAI')

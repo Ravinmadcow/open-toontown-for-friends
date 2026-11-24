@@ -69,8 +69,11 @@ class GardenAI:
         plants = []
         for plot, obj in self.objects.items():
             if hasattr(obj, 'species'):
-                plants.append({'plot': plot, 'species': obj.species, 'variety': obj.variety,
-                               'water': obj.waterLevel, 'growth': obj.growthLevel})
+                plant = {'plot': plot, 'species': obj.species, 'variety': obj.variety,
+                         'water': obj.waterLevel, 'growth': obj.growthLevel}
+                if hasattr(obj, 'optional'):
+                    plant['optional'] = obj.optional  # a toon statue's look
+                plants.append(plant)
         try:
             os.makedirs(_folder(self.air), exist_ok=True)
             tmp = self.__path() + '.tmp'
@@ -98,13 +101,11 @@ class GardenAI:
         for plot, hardPoint in enumerate(GardenGlobals.estatePlots[self.slot]):
             plotType = hardPoint[3]
             x, y, h = self.plotPosition(plot)
-            if plotType not in (GardenGlobals.FLOWER_TYPE, GardenGlobals.GAG_TREE_TYPE):
-                continue  # statues come in a later round
             plant = saved.get(plot)
             attributes = GardenGlobals.PlantAttributes.get(plant['species']) if plant else None
             if attributes and attributes['plantType'] == plotType:
                 obj = self.__makePlant(plot, x, y, h, plant['species'], plant.get('variety', 0),
-                                       plant.get('water', 0), plant.get('growth', 0))
+                                       plant.get('water', 0), plant.get('growth', 0), plant.get('optional', 0))
                 for i in range(missedDays):
                     obj.growOneDay()
                 if hasattr(obj, 'lastWilted'):
@@ -130,12 +131,30 @@ class GardenAI:
         angle = math.radians(bh)
         return bx + offset * math.cos(angle), by + offset * math.sin(angle), bh
 
-    def __makePlant(self, plot, x, y, h, species, variety, water=0, growth=0):
-        if GardenGlobals.PlantAttributes[species]['plantType'] == GardenGlobals.GAG_TREE_TYPE:
+    def __makePlant(self, plot, x, y, h, species, variety, water=0, growth=0, optional=0):
+        plantType = GardenGlobals.PlantAttributes[species]['plantType']
+        if plantType == GardenGlobals.STATUARY_TYPE:
+            return self.__makeStatue(plot, x, y, h, species, water, growth, optional)
+        if plantType == GardenGlobals.GAG_TREE_TYPE:
             from toontown.estate.DistributedGagTreeAI import DistributedGagTreeAI
             return DistributedGagTreeAI(self.air, self, plot, x, y, h, species, water, growth)
         from toontown.estate.DistributedFlowerAI import DistributedFlowerAI
         return DistributedFlowerAI(self.air, self, plot, x, y, h, species, variety, water, growth)
+
+    def __makeStatue(self, plot, x, y, h, species, water=0, growth=0, optional=0):
+        if species in GardenGlobals.ToonStatuaryTypeIndices:
+            from toontown.estate.DistributedToonStatuaryAI import DistributedToonStatuaryAI
+            return DistributedToonStatuaryAI(self.air, self, plot, x, y, h, species, water, growth, optional)
+        if species in GardenGlobals.ChangingStatuaryTypeIndices:
+            from toontown.estate.DistributedChangingStatuaryAI import DistributedChangingStatuaryAI
+            cls = DistributedChangingStatuaryAI
+        elif species in GardenGlobals.AnimatedStatuaryTypeIndices:
+            from toontown.estate.DistributedAnimatedStatuaryAI import DistributedAnimatedStatuaryAI
+            cls = DistributedAnimatedStatuaryAI
+        else:
+            from toontown.estate.DistributedStatuaryAI import DistributedStatuaryAI
+            cls = DistributedStatuaryAI
+        return cls(self.air, self, plot, x, y, h, species, water, growth)
 
     def __makePlot(self, plot):
         from toontown.estate.DistributedGardenPlotAI import DistributedGardenPlotAI
@@ -195,6 +214,18 @@ class GardenAI:
         self.objects[plot] = tree
         tree.movieAvId = avId
         tree.d_setMovie(GardenGlobals.MOVIE_FINISHPLANTING, avId)
+        self.save()
+
+    def plantStatue(self, plotObj, species, optional, avId):
+        plot = plotObj.plot
+        x, y, _ = plotObj.position
+        h = plotObj.heading
+        plotObj.requestDelete()
+        statue = self.__makeStatue(plot, x, y, h, species, optional=optional)
+        statue.generateWithRequired(self.zoneId)
+        self.objects[plot] = statue
+        statue.movieAvId = avId
+        statue.d_setMovie(GardenGlobals.MOVIE_FINISHPLANTING, avId)
         self.save()
 
     def removePlant(self, plant, avId):

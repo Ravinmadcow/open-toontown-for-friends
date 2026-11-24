@@ -12,6 +12,7 @@ class DistributedGardenPlotAI(DistributedLawnDecorAI):
         DistributedLawnDecorAI.__init__(self, air, garden, plot, x, y, h)
         self.pendingFlower = None
         self.pendingTree = None
+        self.pendingStatue = None
 
     def plantFlower(self, species, variety):
         avId = self.air.getAvatarIdFromSender()
@@ -72,19 +73,62 @@ class DistributedGardenPlotAI(DistributedLawnDecorAI):
         self.pendingTree = GardenGlobals.getTreeTypeIndex(track, level)
         self.d_setMovie(GardenGlobals.MOVIE_PLANT, avId)
 
-    # Statues come in a later gardening round.
-
     def plantStatuary(self, species):
-        self.d_interactionDenied(self.air.getAvatarIdFromSender())
+        if species in GardenGlobals.ToonStatuaryTypeIndices:
+            # Toon statues need a toon to copy, sent with plantToonStatuary.
+            avId = self.air.getAvatarIdFromSender()
+            self.movieAvId = avId
+            self.d_setMovie(GardenGlobals.MOVIE_PLANT_REJECTED, avId)
+            return
+        self.__plantStatue(species, 0)
 
     def plantToonStatuary(self, species, dnaCode):
-        self.d_interactionDenied(self.air.getAvatarIdFromSender())
+        if species not in GardenGlobals.ToonStatuaryTypeIndices:
+            avId = self.air.getAvatarIdFromSender()
+            self.movieAvId = avId
+            self.d_setMovie(GardenGlobals.MOVIE_PLANT_REJECTED, avId)
+            return
+        self.__plantStatue(species, dnaCode)
+
+    def __plantStatue(self, species, optional):
+        # A statue uses up the garden special bought from the catalogue, plus
+        # one jellybean per bean in its planting recipe.
+        avId = self.air.getAvatarIdFromSender()
+        av = self.air.doId2do.get(avId)
+        if av is None or not self.isOwner(avId) or self.movieAvId:
+            self.d_interactionDenied(avId)
+            return
+        self.movieAvId = avId
+        attributes = GardenGlobals.PlantAttributes.get(species)
+        recipe = None
+        if attributes and attributes['plantType'] == GardenGlobals.STATUARY_TYPE:
+            recipe = GardenGlobals.Recipes.get(attributes['varieties'][0][0])
+        hardPoint = GardenGlobals.estatePlots[self.garden.slot][self.plot]
+        if recipe is None or recipe['special'] < 0 or hardPoint[3] != GardenGlobals.STATUARY_TYPE:
+            self.d_setMovie(GardenGlobals.MOVIE_PLANT_REJECTED, avId)
+            return
+        special = recipe['special']
+        beans = len(recipe['beans'])
+        hasSpecial = any(index == special and count > 0 for index, count in av.getGardenSpecials())
+        shovelPower = GardenGlobals.getShovelPower(av.getShovel(), av.getShovelSkill())
+        if not hasSpecial or beans > shovelPower or av.getMoney() < beans:
+            self.d_setMovie(GardenGlobals.MOVIE_PLANT_REJECTED, avId)
+            return
+        av.b_setMoney(av.getMoney() - beans)
+        av.removeGardenItem(special, 1)
+        self.pendingStatue = (species, optional)
+        self.d_setMovie(GardenGlobals.MOVIE_PLANT, avId)
 
     def movieDone(self):
         avId = self.air.getAvatarIdFromSender()
         if avId != self.movieAvId:
             return
-        if self.pendingTree is not None:
+        if self.pendingStatue is not None:
+            species, optional = self.pendingStatue
+            self.pendingStatue = None
+            self.movieAvId = 0
+            self.garden.plantStatue(self, species, optional, avId)
+        elif self.pendingTree is not None:
             typeIndex = self.pendingTree
             self.pendingTree = None
             self.movieAvId = 0
