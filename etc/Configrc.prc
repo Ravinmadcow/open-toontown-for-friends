@@ -107,4 +107,4 @@ skip-phone-quest true
 force-holidays 4
 
 # How fast gags rank up: 1 = normal Toontown, 2 = twice as fast, 0.5 = half speed.
-gag-xp-multiplier 1
+gag-xp-multiplier 2
