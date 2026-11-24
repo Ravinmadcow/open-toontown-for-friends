@@ -3,12 +3,20 @@ from toontown.toonbase import ToontownBattleGlobals
 from toontown.suit import SuitDNA
 BattleExperienceAINotify = DirectNotifyGlobal.directNotify.newCategory('BattleExprienceAI')
 
+def getGagXpMultiplier():
+    # 'gag-xp-multiplier' in etc/Configrc.prc speeds up (or slows down) how fast
+    # gags rank up. 1 is normal Toontown; 2 is twice as fast. It stacks with the
+    # usual building, invasion and Cog HQ bonuses.
+    from panda3d.core import ConfigVariableDouble
+    return max(0.0, ConfigVariableDouble('gag-xp-multiplier', 1.0).value)
+
+
 def getSkillGained(toonSkillPtsGained, toonId, track):
     exp = 0
     expList = toonSkillPtsGained.get(toonId, None)
     if expList != None:
         exp = expList[track]
-    return int(exp + 0.5)
+    return int(exp * getGagXpMultiplier() + 0.5)
 
 
 def getBattleExperience(numToons, activeToons, toonExp, toonSkillPtsGained, toonOrigQuests, toonItems, toonOrigMerits, toonMerits, toonParts, suitsKilled, helpfulToonsList=None):

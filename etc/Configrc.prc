@@ -105,3 +105,6 @@ skip-phone-quest true
 # Holidays (server). Winter decorations switch on by themselves 1 Dec - 2 Jan.
 # force-holidays turns holidays on now: 4 = Winter Decorations. Delete the line to stop.
 force-holidays 4
+
+# How fast gags rank up: 1 = normal Toontown, 2 = twice as fast, 0.5 = half speed.
+gag-xp-multiplier 1
