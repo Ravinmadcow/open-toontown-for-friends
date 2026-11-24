@@ -309,6 +309,9 @@ class DistributedMinigameAI(DistributedObjectAI.DistributedObjectAI):
                 score = randReward
             if ToontownGlobals.JELLYBEAN_TROLLEY_HOLIDAY in simbase.air.holidayManager.currentHolidays or ToontownGlobals.JELLYBEAN_TROLLEY_HOLIDAY_MONTH in simbase.air.holidayManager.currentHolidays:
                 score *= MinigameGlobals.JellybeanTrolleyHolidayScoreMultiplier
+            # Server setting 'jellybean-multiplier' (applied before the usual 255 limit).
+            from toontown.ai import JellybeanRewards
+            score = JellybeanRewards.scale(score)
             logEvent = False
             if score > 255:
                 score = 255

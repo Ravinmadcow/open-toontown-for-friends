@@ -18256,7 +18256,9 @@ class MoneyReward(Reward):
     def sendRewardAI(self, av):
         money = av.getMoney()
         maxMoney = av.getMaxMoney()
-        av.addMoney(self.getAmount())
+        # Server setting 'jellybean-multiplier'; task posters still show the normal amount.
+        from toontown.ai import JellybeanRewards
+        av.addMoney(JellybeanRewards.scale(self.getAmount()))
 
     def countReward(self, qrc):
         qrc.money += self.getAmount()

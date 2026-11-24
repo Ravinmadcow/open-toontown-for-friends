@@ -58,7 +58,8 @@ class FishManagerAI:
             return (code, genus, species, weight)
 
         if itemType == FishGlobals.JellybeanItem:
-            amount = FishGlobals.Rod2JellybeanDict.get(rodId, 10)
+            from toontown.ai import JellybeanRewards
+            amount = JellybeanRewards.scale(FishGlobals.Rod2JellybeanDict.get(rodId, 10))
             av.addMoney(amount)
             return (FishGlobals.JellybeanItem, amount, 0, 0)
 
@@ -72,7 +73,8 @@ class FishManagerAI:
         av.b_setFishCollection(*av.fishCollection.getNetLists())
         av.b_setFishTank([], [], [])
         if value:
-            av.addMoney(value)
+            from toontown.ai import JellybeanRewards
+            av.addMoney(JellybeanRewards.scale(value))
 
         trophies = len(av.fishCollection) // 10
         oldTrophies = len(av.getFishingTrophies())
