@@ -13,6 +13,7 @@ class DistributedFishingPondAI(DistributedObjectAI):
         self.area = None
         self.targets = []
         self.spots = []
+        self.bingoMgr = None
 
     def announceGenerate(self):
         DistributedObjectAI.announceGenerate(self)
@@ -21,9 +22,17 @@ class DistributedFishingPondAI(DistributedObjectAI):
             target = DistributedFishingTargetAI(self.air, self)
             target.generateWithRequired(self.zoneId)
             self.targets.append(target)
+        self.__bingoMgr().addPond(self)
+
+    def __bingoMgr(self):
+        from toontown.fishing.FishBingoMgrAI import FishBingoMgrAI
+        if getattr(self.air, 'fishBingoMgr', None) is None:
+            self.air.fishBingoMgr = FishBingoMgrAI(self.air)
+        return self.air.fishBingoMgr
 
     def cleanup(self):
         """Removes the pond with its spots and fish shadows (used by estates)."""
+        self.__bingoMgr().removePond(self)
         for obj in self.spots + self.targets:
             obj.requestDelete()
         self.spots = []

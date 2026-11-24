@@ -61,6 +61,9 @@ class DistributedFishingSpotAI(DistributedObjectAI):
         taskMgr.remove(self.uniqueName('timeout'))
         if self.avId:
             self.ignore(self.air.getAvatarExitEvent(self.avId))
+            bingoMgr = getattr(self.pond, 'bingoMgr', None)
+            if bingoMgr is not None:
+                bingoMgr.removeToon(self.avId)
             self.avId = 0
             self.cast = False
             self.d_setOccupied(0)
@@ -79,6 +82,9 @@ class DistributedFishingSpotAI(DistributedObjectAI):
         self.d_setOccupied(avId)
         self.d_setMovie(FishGlobals.EnterMovie)
         self.__startTimeout()
+        bingoMgr = getattr(self.pond, 'bingoMgr', None)
+        if bingoMgr is not None:
+            bingoMgr.addToon(avId)
 
     def requestExit(self):
         avId = self.air.getAvatarIdFromSender()
@@ -122,5 +128,8 @@ class DistributedFishingSpotAI(DistributedObjectAI):
         self.cast = False
         area = self.pond.getArea() if self.pond else 0
         code, item1, item2, item3 = self.air.fishManager.generateCatch(av, area, self.zoneId)
+        bingoMgr = getattr(self.pond, 'bingoMgr', None)
+        if bingoMgr is not None:
+            bingoMgr.recordCatch(self.avId, code, item1, item2)
         self.d_setMovie(FishGlobals.PullInMovie, code, item1, item2, item3)
         self.__startTimeout()

@@ -12,6 +12,11 @@ AUTO_HOLIDAYS = [
     (ToontownGlobals.WINTER_CAROLING, (12, 14), (1, 4)),
 ]
 
+# Holidays that run on a day of the week: (holidayId, weekday) with Monday = 0.
+WEEKLY_HOLIDAYS = [
+    (ToontownGlobals.FISH_BINGO_NIGHT, 2),  # Fish Bingo all day on Wednesdays
+]
+
 
 class NewsManagerAI(DistributedObjectAI):
     notify = DirectNotifyGlobal.directNotify.newCategory('NewsManagerAI')
@@ -51,6 +56,9 @@ class NewsManagerAI(DistributedObjectAI):
             for holidayId, start, end in AUTO_HOLIDAYS:
                 if self.__inRange(today, start, end):
                     ids.append(holidayId)
+            for holidayId, weekday in WEEKLY_HOLIDAYS:
+                if today.weekday() == weekday:
+                    ids.append(holidayId)
         return sorted(set(ids))
 
     def updateHolidays(self):
@@ -62,6 +70,7 @@ class NewsManagerAI(DistributedObjectAI):
         if manager is not None:
             manager.currentHolidays = {holidayId: True for holidayId in ids}
         self.__updateWinterCaroling(ids)
+        self.__updateFishBingo(ids)
         self.notify.warning('Active holidays: %s' % (ids or 'none'))
         self.sendUpdate('setHolidayIdList', [ids])
 
@@ -77,6 +86,19 @@ class NewsManagerAI(DistributedObjectAI):
                 self.air.winterCarolingMgr.stop()
         except Exception as e:
             self.notify.warning('Could not update Winter Caroling: %s' % e)
+
+    def __updateFishBingo(self, ids):
+        from toontown.fishing.FishBingoMgrAI import FishBingoMgrAI
+        if getattr(self.air, 'fishBingoMgr', None) is None:
+            self.air.fishBingoMgr = FishBingoMgrAI(self.air)
+        bingo = ToontownGlobals.FISH_BINGO_NIGHT in ids or ToontownGlobals.SILLY_SATURDAY_BINGO in ids
+        try:
+            if bingo:
+                self.air.fishBingoMgr.start()
+            else:
+                self.air.fishBingoMgr.stop()
+        except Exception as e:
+            self.notify.warning('Could not update Fish Bingo: %s' % e)
 
     def __checkHolidays(self, task):
         self.updateHolidays()
