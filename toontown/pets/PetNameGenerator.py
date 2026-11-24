@@ -6,6 +6,13 @@ from direct.showbase import AppRunnerGlobal
 from direct.directnotify import DirectNotifyGlobal
 from panda3d.core import *
 
+def _text(line):
+    # Panda3D returns bytes on Python 3.
+    if isinstance(line, bytes):
+        return line.decode('utf-8', 'replace')
+    return line
+
+
 class PetNameGenerator:
     notify = DirectNotifyGlobal.directNotify.newCategory('PetNameGenerator')
     boyFirsts = []
@@ -30,18 +37,22 @@ class PetNameGenerator:
             else:
                 searchPath.appendDirectory(Filename.fromOsSpecific(os.path.expandvars('toontown/src/configfiles')))
             searchPath.appendDirectory(Filename('.'))
+        # Open Toontown keeps game files under the model path (the resources folder).
+        modelPath = getModelPath().getValue()
+        for i in range(modelPath.getNumDirectories()):
+            searchPath.appendDirectory(Filename(modelPath.getDirectory(i), 'phase_3/etc'))
         filename = Filename(TTLocalizer.PetNameMaster)
         found = vfs.resolveFilename(filename, searchPath)
         if not found:
             self.notify.error('PetNameGenerator: Error opening name list text file.')
         input = StreamReader(vfs.openReadFile(filename, 1), 1)
-        currentLine = input.readline()
+        currentLine = _text(input.readline())
         while currentLine:
             if currentLine.lstrip()[0:1] != '#':
                 a1 = currentLine.find('*')
                 a2 = currentLine.find('*', a1 + 1)
                 self.nameDictionary[int(currentLine[0:a1])] = (int(currentLine[a1 + 1:a2]), currentLine[a2 + 1:len(currentLine) - 1].strip())
-            currentLine = input.readline()
+            currentLine = _text(input.readline())
 
         masterList = [self.boyFirsts, self.girlFirsts, self.neutralFirsts]
         for tu in list(self.nameDictionary.values()):

@@ -131,3 +131,10 @@ class FriendManager(DistributedObject.DistributedObject):
 
     def d_requestRemoveFriend(self, avId):
         self.sendUpdate('requestRemoveFriend', [avId])
+
+    # ---- doodle details (Open Toontown server) ----------------------------
+    def d_requestPetInfo(self, petId):
+        self.sendUpdate('requestPetInfo', [petId])
+
+    def petInfoResponse(self, petId, returnCode, data):
+        base.cr.handleAstronPetInfo(petId, returnCode, data)

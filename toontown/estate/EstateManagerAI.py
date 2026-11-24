@@ -20,6 +20,7 @@ class EstateInstance:
         self.ready = False
         self.waiting = []  # avIds waiting for this estate to finish loading
         self.ponds = []
+        self.petIds = {}   # toon id -> doodle id, for every toon on the account
 
 
 class EstateManagerAI(DistributedObjectAI):
@@ -40,6 +41,33 @@ class EstateManagerAI(DistributedObjectAI):
         self.avId2estate = {}   # which estate each toon is currently in
         self.estate = {}        # ownerAvId -> DistributedEstateAI (used by catalog code)
         self.pondGroups = None  # fishing pond layout from the estate DNA, loaded once
+
+    # ---- lookups used by doodles and toons ------------------------------------
+    def getOwnerFromZone(self, zoneId):
+        instance = self.zoneId2estate.get(zoneId)
+        if instance is None:
+            for inst in self.accountId2estate.values():
+                if zoneId in self.__houseZones(inst):
+                    instance = inst
+                    break
+        return instance.ownerId if instance is not None else 0
+
+    def __instanceForOwner(self, ownerId):
+        for inst in self.accountId2estate.values():
+            if ownerId == inst.ownerId or ownerId in getattr(inst, 'toonIds', ()):
+                return inst
+        return None
+
+    def __houseZones(self, instance):
+        return [house.interiorZone for house in instance.houses if getattr(house, 'interiorZone', None)]
+
+    def getEstateZones(self, ownerId):
+        instance = self.__instanceForOwner(ownerId)
+        return [instance.zoneId] if instance is not None else []
+
+    def getEstateHouseZones(self, ownerId):
+        instance = self.__instanceForOwner(ownerId)
+        return self.__houseZones(instance) if instance is not None else []
 
     # ---- client requests ----------------------------------------------------
     def getEstateZone(self, avId, name):
@@ -108,6 +136,7 @@ class EstateManagerAI(DistributedObjectAI):
             online = self.air.doId2do.get(avId)
             if online is not None and hasattr(online, 'getName'):
                 names[avId] = online.getName()
+                instance.petIds[avId] = getattr(online, 'petId', 0) or 0
                 pending.discard(avId)
         if not pending:
             finish()
@@ -119,6 +148,10 @@ class EstateManagerAI(DistributedObjectAI):
                     names[avId] = toonFields['setName'][0]
                 except Exception:
                     names[avId] = ''
+                try:
+                    instance.petIds[avId] = (toonFields.get('setPetId') or [0])[0]
+                except Exception:
+                    pass
                 pending.discard(avId)
                 if not pending:
                     finish()
@@ -182,6 +215,13 @@ class EstateManagerAI(DistributedObjectAI):
                     estate.createGarden(slot, avId)
                 except Exception as e:
                     self.notify.warning('Could not set up garden %s: %s' % (slot, e))
+        # Doodles: every toon's doodle on this account roams the estate.
+        if getattr(self.air, 'petMgr', None) is not None:
+            try:
+                petIds = [petId for petId in instance.petIds.values() if petId]
+                self.air.petMgr.spawnPets(instance.zoneId, petIds)
+            except Exception as e:
+                self.notify.warning('Could not load doodles: %s' % e)
         self.notify.info('Loaded estate for account %s in zone %s' % (instance.accountId, instance.zoneId))
 
         waiting, instance.waiting = instance.waiting, []
@@ -200,6 +240,13 @@ class EstateManagerAI(DistributedObjectAI):
         self.avId2estate[avId] = instance
         self.acceptOnce(self.air.getAvatarExitEvent(avId), self.__leave, [avId])
         self.sendUpdateToAvatarId(avId, 'setEstateZone', [instance.ownerId, instance.zoneId])
+        # Lets doodles see and react to this toon.
+        toon = self.air.doId2do.get(avId)
+        if toon is not None and hasattr(toon, 'enterEstate'):
+            try:
+                toon.enterEstate(instance.ownerId, instance.zoneId)
+            except Exception as e:
+                self.notify.warning('enterEstate failed for %s: %s' % (avId, e))
 
     def __leave(self, avId):
         instance = self.avId2estate.pop(avId, None)
@@ -207,6 +254,12 @@ class EstateManagerAI(DistributedObjectAI):
         if instance is None:
             return
         instance.visitors.discard(avId)
+        toon = self.air.doId2do.get(avId)
+        if toon is not None and hasattr(toon, 'isInEstate') and toon.isInEstate():
+            try:
+                toon.exitEstate()
+            except Exception as e:
+                self.notify.warning('exitEstate failed for %s: %s' % (avId, e))
         if not instance.visitors and instance.ready:
             self.__unload(instance)
 
@@ -236,6 +289,11 @@ class EstateManagerAI(DistributedObjectAI):
             instance.ponds.append(pond)
 
     def __unload(self, instance):
+        if getattr(self.air, 'petMgr', None) is not None:
+            try:
+                self.air.petMgr.despawnPets(instance.zoneId)
+            except Exception as e:
+                self.notify.warning('Could not put doodles away: %s' % e)
         for pond in instance.ponds:
             try:
                 pond.cleanup()

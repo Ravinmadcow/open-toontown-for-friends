@@ -334,6 +334,8 @@ dclass FriendManager : DistributedObject {
   requestAvatarInfo(uint32 []) airecv clsend;
   avatarInfoResponse(FriendListEntry []);
   requestRemoveFriend(uint32) airecv clsend;
+  requestPetInfo(uint32) airecv clsend;
+  petInfoResponse(uint32, uint8, blob);
 };
 
 struct FriendInfo {

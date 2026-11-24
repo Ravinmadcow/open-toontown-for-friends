@@ -10,6 +10,7 @@ from direct.interval.IntervalGlobal import *
 from toontown.toonbase import ToontownGlobals
 from direct.task import Task
 from otp.movement import Mover
+from panda3d.toontown import CPetChase, CPetFlee
 from toontown.pets import PetChase, PetFlee, PetWander, PetLeash
 from toontown.pets import PetCollider, PetSphere, PetLookerAI
 from toontown.pets import PetConstants, PetDNA, PetTraits
@@ -548,6 +549,10 @@ class DistributedPetAI(DistributedSmoothNodeAI.DistributedSmoothNodeAI, PetLooke
             return
         self.setHasRequestedDelete(True)
         self.b_setLastSeenTimestamp(self.getCurEpochTimestamp())
+        # Save the doodle's mood and tricks before it goes (Open Toontown server).
+        petMgr = getattr(simbase.air, 'petMgr', None)
+        if petMgr is not None and hasattr(petMgr, 'petLeaving'):
+            petMgr.petLeaving(self)
         DistributedSmoothNodeAI.DistributedSmoothNodeAI.requestDelete(self)
 
     def _doDeleteCleanup(self):

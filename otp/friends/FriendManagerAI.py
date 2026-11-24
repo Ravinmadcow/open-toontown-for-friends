@@ -256,6 +256,52 @@ class FriendManagerAI(DistributedObjectGlobalAI):
         avIds = list(avIds)[:50]
         self.__getInfo(avIds, lambda entries: self.sendUpdateToAvatarId(avId, 'avatarInfoResponse', [entries]))
 
+    def requestPetInfo(self, petId):
+        """A doodle's details (name, look, traits, mood) for the doodle panel
+        and the pet shop, packed the way the client's PetDetail expects."""
+        avId = self.air.getAvatarIdFromSender()
+
+        def reply(fields):
+            data = self.__packPetFields(fields) if fields else None
+            if data is None:
+                self.sendUpdateToAvatarId(avId, 'petInfoResponse', [petId, 1, b''])
+            else:
+                self.sendUpdateToAvatarId(avId, 'petInfoResponse', [petId, 0, data])
+
+        pet = self.air.doId2do.get(petId)
+        petMgr = getattr(self.air, 'petMgr', None)
+        if pet is not None and pet.__class__.__name__ == 'DistributedPetAI' and petMgr is not None:
+            reply(petMgr.getPetFields(pet))
+            return
+
+        def gotPet(dclass, fields):
+            if dclass is None or dclass.getName() != 'DistributedPet':
+                fields = None
+            reply(fields)
+        self.air.dbInterface.queryObject(self.air.dbId, petId, gotPet)
+
+    def __packPetFields(self, fields):
+        from panda3d.direct import DCPacker
+        dclass = self.air.dclassesByName['DistributedPetAI']
+        packer = DCPacker()
+        try:
+            for i in range(dclass.getNumInheritedFields()):
+                field = dclass.getInheritedField(i)
+                if not field.isRequired() or field.asMolecularField():
+                    continue
+                args = fields.get(field.getName())
+                packer.beginPack(field)
+                if args is not None:
+                    field.packArgs(packer, list(args))
+                else:
+                    packer.packLiteralValue(field.getDefaultValue())
+                if not packer.endPack():
+                    raise ValueError('could not pack %s' % field.getName())
+        except Exception as e:
+            self.notify.warning('Could not pack doodle details: %s' % e)
+            return None
+        return packer.getBytes()
+
     def requestRemoveFriend(self, friendId):
         avId = self.air.getAvatarIdFromSender()
         for a, b in ((avId, friendId), (friendId, avId)):

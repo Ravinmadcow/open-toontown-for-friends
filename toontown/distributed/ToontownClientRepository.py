@@ -415,7 +415,18 @@ class ToontownClientRepository(OTPClientRepository.OTPClientRepository):
         pad.delayDelete = DelayDelete.DelayDelete(avatar, 'getAvatarDetails')
         avId = avatar.doId
         self.__queryAvatarMap[avId] = pad
+        if args and args[0] == 'DistributedPet' and getattr(self, 'friendManager', None):
+            # Open Toontown's server answers doodle details through the friend manager.
+            self.friendManager.d_requestPetInfo(avId)
+            return
         self.__sendGetAvatarDetails(avId)
+
+    def handleAstronPetInfo(self, petId, returnCode, data):
+        datagram = PyDatagram()
+        datagram.addUint32(petId)
+        datagram.addUint8(returnCode)
+        datagram.appendData(data)
+        self.handleGetAvatarDetailsResp(PyDatagramIterator(datagram))
 
     def cancelAvatarDetailsRequest(self, avatar):
         avId = avatar.doId
