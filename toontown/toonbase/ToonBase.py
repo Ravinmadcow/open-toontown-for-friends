@@ -147,6 +147,10 @@ class ToonBase(OTPBase.OTPBase):
         self.oldX = max(1, base.win.getXSize())
         self.oldY = max(1, base.win.getYSize())
         self.aspectRatio = float(self.oldX) / self.oldY
+        self.gamepad = None
+        if ConfigVariableBool('want-gamepad', 1).value:
+            from toontown.toonbase.GamepadBridge import GamepadBridge
+            self.gamepad = GamepadBridge()
         return
 
     def windowEvent(self, win):

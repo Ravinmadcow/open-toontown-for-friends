@@ -833,8 +833,25 @@ class DistributedVehicle(DistributedSmoothNode.DistributedSmoothNode, Kart.Kart,
             else:
                 self.wheelPosition = -maxWheelDeflection
 
+    def __applyGamepadInput(self):
+        pad = getattr(base, 'gamepad', None)
+        usePad = pad is not None and pad.isActive() and pad.analogRacing and getattr(self, 'canRace', False)
+        steer = throttle = 0.0
+        if usePad:
+            steer = pad.getSteer()
+            throttle = pad.getThrottle()
+        if steer or throttle:
+            self.arrowHorz = steer
+            self.arrowVert = throttle
+            self._padDriving = True
+        elif getattr(self, '_padDriving', False):
+            self.arrowHorz = 0
+            self.arrowVert = 0
+            self._padDriving = False
+
     def __watchControls(self, task):
         dt = globalClock.getDt()
+        self.__applyGamepadInput()
         curVelocity = self.actorNode.getPhysicsObject().getVelocity()
         curSpeed = curVelocity.length()
         fvec = self.forward.getPos(render) - self.getPos(render)
