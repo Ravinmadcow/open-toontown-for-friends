@@ -725,6 +725,20 @@ class DistributedBattleBaseAI(DistributedObjectAI.DistributedObjectAI, BattleBas
             self.notify.warning('getToon() - toon: %d not in repository!' % toonId)
         return None
 
+    def isBotToon(self, avId):
+        # Battle bots (AI helper toons) never send responses, so the battle
+        # must never wait on them.
+        mgr = getattr(self.air, 'battleBotMgr', None)
+        return mgr is not None and mgr.isBot(avId)
+
+    def removeBotToon(self, botId):
+        # Called by the BattleBotManagerAI when a bot's owner leaves.
+        if botId not in self.toons:
+            return
+        if self.fsm.getCurrentState().getName() in ('Resume', 'Off'):
+            return
+        self.__handleSuddenExit(botId, 0)
+
     def toonRequestRun(self):
         toonId = self.air.getAvatarIdFromSender()
         if self.ignoreResponses == 1:
@@ -794,7 +808,7 @@ class DistributedBattleBaseAI(DistributedObjectAI.DistributedObjectAI, BattleBas
 
     def allToonsResponded(self):
         for t in self.toons:
-            if self.responses[t] == 0:
+            if self.responses[t] == 0 and not self.isBotToon(t):
                 return 0
 
         self.ignoreResponses = 1
@@ -802,7 +816,7 @@ class DistributedBattleBaseAI(DistributedObjectAI.DistributedObjectAI, BattleBas
 
     def __allPendingActiveToonsResponded(self):
         for t in self.pendingToons + self.activeToons:
-            if self.responses[t] == 0:
+            if self.responses[t] == 0 and not self.isBotToon(t):
                 return 0
 
         self.ignoreResponses = 1
@@ -810,7 +824,7 @@ class DistributedBattleBaseAI(DistributedObjectAI.DistributedObjectAI, BattleBas
 
     def __allActiveToonsResponded(self):
         for t in self.activeToons:
-            if self.responses[t] == 0:
+            if self.responses[t] == 0 and not self.isBotToon(t):
                 return 0
 
         self.ignoreResponses = 1
@@ -842,7 +856,7 @@ class DistributedBattleBaseAI(DistributedObjectAI.DistributedObjectAI, BattleBas
 
     def __allAdjustingToonsResponded(self):
         for t in self.toons:
-            if self.adjustingResponses[t] == 0:
+            if self.adjustingResponses[t] == 0 and not self.isBotToon(t):
                 return 0
 
         self.ignoreAdjustingResponses = 1
@@ -887,7 +901,7 @@ class DistributedBattleBaseAI(DistributedObjectAI.DistributedObjectAI, BattleBas
     def __allToonsRespondedJoin(self, avId):
         jr = self.joinResponses[avId]
         for t in self.toons:
-            if jr[t] == 0:
+            if jr.get(t, 0) == 0 and not self.isBotToon(t):
                 return 0
 
         return 1
@@ -1175,6 +1189,9 @@ class DistributedBattleBaseAI(DistributedObjectAI.DistributedObjectAI, BattleBas
         self.movieHasBeenMade = 1
         self.movieHasPlayed = 0
         self.rewardHasPlayed = 0
+        botMgr = getattr(self.air, 'battleBotMgr', None)
+        if botMgr:
+            botMgr.chooseAttacks(self, final=True)
         for t in self.activeToons:
             if t not in self.toonAttacks:
                 self.toonAttacks[t] = getToonAttack(t)
@@ -1252,6 +1269,9 @@ class DistributedBattleBaseAI(DistributedObjectAI.DistributedObjectAI, BattleBas
                 if toon is not None:
                     toon.doRestock(0)
 
+        botMgr = getattr(self.air, 'battleBotMgr', None)
+        if botMgr:
+            botMgr.handleWaitForInput(self)
         return None
 
     def exitWaitForInput(self):

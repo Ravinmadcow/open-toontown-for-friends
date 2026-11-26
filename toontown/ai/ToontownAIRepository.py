@@ -52,6 +52,7 @@ from toontown.shtiker.CogPageManagerAI import CogPageManagerAI
 from toontown.spellbook.ToontownMagicWordManagerAI import ToontownMagicWordManagerAI
 from toontown.suit.SuitInvasionManagerAI import SuitInvasionManagerAI
 from toontown.toon import NPCToons
+from toontown.battle.BattleBotManagerAI import BattleBotManagerAI
 from toontown.toonbase import ToontownGlobals
 from toontown.tutorial.TutorialManagerAI import TutorialManagerAI
 from toontown.uberdog.DistributedInGameNewsMgrAI import DistributedInGameNewsMgrAI
@@ -186,6 +187,9 @@ class ToontownAIRepository(ToontownInternalRepository):
 
         # Create our Cog suit manager...
         self.cogSuitMgr = CogSuitManagerAI(self)
+
+        # Create our battle bot (AI helper toon) manager...
+        self.battleBotMgr = BattleBotManagerAI(self)
 
     def createGlobals(self):
         """
