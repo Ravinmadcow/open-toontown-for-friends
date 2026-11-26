@@ -111,6 +111,3 @@ gag-xp-multiplier 2
 
 # Jellybeans from trolley games, fishing and ToonTask rewards: 1 = normal, 2 = twice as many.
 jellybean-multiplier 3
-
-want-battle-bots #t
-battle-bots-per-toon 3
