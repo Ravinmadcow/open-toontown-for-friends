@@ -826,22 +826,6 @@ class Fireworks(MagicWord):
             del self.fireworkShows[zoneId]
 
 
-class BattleBots(MagicWord):
-    aliases = ["bots", "helpers"]
-    desc = "Sets how many AI helper toons join the target's street battles (0-3)."
-    execLocation = MagicWordConfig.EXEC_LOC_SERVER
-    arguments = [("count", int, True)]
-
-    def handleWord(self, invoker, avId, toon, *args):
-        count = args[0]
-        mgr = getattr(self.air, 'battleBotMgr', None)
-        if mgr is None or not mgr.enabled:
-            return "Battle bots are turned off on this server (want-battle-bots)."
-        mgr.setBotCount(avId, count)
-        count = mgr.getBotCount(avId)
-        return "%s will get %d helper toon%s in street battles." % (toon.getName(), count, '' if count == 1 else 's')
-
-
 # Instantiate all classes defined here to register them.
 # A bit hacky, but better than the old system
 for item in list(globals().values()):
